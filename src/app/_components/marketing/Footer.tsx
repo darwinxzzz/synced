@@ -109,25 +109,27 @@ export function Footer() {
               </p>
               <div className="flex flex-col gap-3">
                 {links.map((link) => (
-                  <button
+                  <a
                     key={link}
+                    href="#"
                     className="text-left transition-colors duration-200"
                     style={{
                       fontFamily: "'DM Sans', sans-serif",
                       fontSize: "15px",
                       color: "var(--stone-grey)",
+                      textDecoration: "none",
                     }}
                     onMouseEnter={(e) =>
-                      ((e.currentTarget as HTMLButtonElement).style.color =
+                      ((e.currentTarget as HTMLAnchorElement).style.color =
                         "var(--ivory-paper)")
                     }
                     onMouseLeave={(e) =>
-                      ((e.currentTarget as HTMLButtonElement).style.color =
+                      ((e.currentTarget as HTMLAnchorElement).style.color =
                         "var(--stone-grey)")
                     }
                   >
                     {link}
-                  </button>
+                  </a>
                 ))}
               </div>
             </div>
@@ -146,29 +148,31 @@ export function Footer() {
               color: "var(--stone-grey)",
             }}
           >
-            © 2025 Event Sync. All rights reserved.
+            © 2026 Event Sync. All rights reserved.
           </p>
           <div className="flex gap-6">
             {["Privacy Policy", "Terms", "Cookie Settings"].map((item) => (
-              <button
+              <a
                 key={item}
+                href="#"
                 className="transition-colors duration-200"
                 style={{
                   fontFamily: "'DM Sans', sans-serif",
                   fontSize: "13px",
                   color: "var(--stone-grey)",
+                  textDecoration: "none",
                 }}
                 onMouseEnter={(e) =>
-                  ((e.currentTarget as HTMLButtonElement).style.color =
+                  ((e.currentTarget as HTMLAnchorElement).style.color =
                     "var(--ivory-paper)")
                 }
                 onMouseLeave={(e) =>
-                  ((e.currentTarget as HTMLButtonElement).style.color =
+                  ((e.currentTarget as HTMLAnchorElement).style.color =
                     "var(--stone-grey)")
                 }
               >
                 {item}
-              </button>
+              </a>
             ))}
           </div>
         </div>

@@ -1,14 +1,9 @@
+"use client";
 import { useState, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { Bell, Search, Menu, X, ChevronDown } from "lucide-react";
 import { useRole } from "../context/RoleContext";
-
-const brandLogo = "/placeholder.jpg";
-
-const CARD_SHADOW = {
-  boxShadow:
-    "rgba(14,63,126,0.04) 0px 0px 0px 1px, rgba(42,51,69,0.04) 0px 1px 1px -0.5px, rgba(42,51,70,0.04) 0px 3px 3px -1.5px, rgba(42,51,70,0.04) 0px 6px 6px -3px, rgba(14,63,126,0.04) 0px 12px 12px -6px, rgba(14,63,126,0.04) 0px 24px 24px -12px",
-};
+import { CARD_SHADOW } from "./constants";
 
 const ADMIN_LINKS = [
   { label: "Dashboard", path: "/dashboard" },
@@ -72,11 +67,7 @@ export function Navbar() {
               className="flex items-center gap-2 select-none cursor-pointer flex-shrink-0"
               onClick={() => router.push("/")}
             >
-              <img
-                src={brandLogo}
-                alt="Event Sync logo"
-                style={{ width: 36, height: 36, objectFit: "contain" }}
-              />
+              <span style={{ fontSize: "28px", lineHeight: 1 }}>🎋</span>
               <span
                 style={{
                   fontFamily: "'Playfair Display', serif",
@@ -223,11 +214,7 @@ export function Navbar() {
                 className="absolute left-1/2 -translate-x-1/2 flex items-center gap-2 select-none cursor-pointer"
                 onClick={() => router.push("/")}
               >
-                <img
-                  src={brandLogo}
-                  alt="Event Sync logo"
-                  style={{ width: 28, height: 28, objectFit: "contain" }}
-                />
+                <span style={{ fontSize: "22px", lineHeight: 1 }}>🎋</span>
                 <span
                   style={{
                     fontFamily: "'Playfair Display', serif",
@@ -375,6 +362,7 @@ export function Navbar() {
                 {/* Hamburger */}
                 <button
                   data-nav-menu
+                  aria-label={menuOpen ? "Close menu" : "Open menu"}
                   className="md:hidden w-9 h-9 rounded-full flex items-center justify-center"
                   style={{ background: "rgba(168,197,160,0.18)" }}
                   onClick={() => setMenuOpen((v) => !v)}
