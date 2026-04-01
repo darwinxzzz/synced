@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm run:*)",
+      "Bash(node -e \"const r = require\\(''''./node_modules/react-resizable-panels/dist/react-resizable-panels.js''''\\); console.log\\(Object.keys\\(r\\)\\)\")"
+    ]
+  }
+}
