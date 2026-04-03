@@ -1,3 +1,4 @@
+"use client";
 import { Camera, Briefcase, MessageCircle, Code } from "lucide-react";
 
 const FOOTER_LINKS = {

@@ -2,12 +2,11 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, CheckCircle2, Star } from "lucide-react";
-import { Navbar } from "./Navbar";
-import { Footer } from "./Footer";
 import { BentoSection } from "./BentoSection";
 import { CTABanner } from "./CTABanner";
 import { BlurHeading } from "./BlurHeading";
 import { CARD_SHADOW, HERO_BG } from "./constants";
+import { api } from "~/trpc/react";
 
 // ── Testimonials data ────────────────────────────────────────────────────────
 const TESTIMONIALS = [
@@ -154,7 +153,12 @@ function TestimonialsSection() {
 // ── Newsletter Section ───────────────────────────────────────────────────────
 function NewsletterSection() {
   const [email, setEmail] = useState("");
-  const [submitted, setSubmitted] = useState(false);
+  const subscribe = api.newsletter.subscribe.useMutation();
+
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (email) subscribe.mutate({ email });
+  };
 
   return (
     <section id="contact" className="py-24" style={{ background: "var(--deep-forest)" }}>
@@ -168,7 +172,7 @@ function NewsletterSection() {
         <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "18px", color: "var(--stone-grey)", lineHeight: 1.6, marginBottom: "32px" }}>
           Monthly insights on community event management, product updates, and wabi-sabi leadership.
         </p>
-        {submitted ? (
+        {subscribe.isSuccess ? (
           <div className="flex flex-col items-center gap-4 animate-blur-in">
             <div className="w-16 h-16 rounded-full flex items-center justify-center" style={{ background: "rgba(74,124,89,0.25)" }}>
               <CheckCircle2 size={32} color="var(--bamboo-green)" />
@@ -179,10 +183,7 @@ function NewsletterSection() {
           </div>
         ) : (
           <>
-            <form
-              className="flex flex-col sm:flex-row gap-3"
-              onSubmit={(e) => { e.preventDefault(); if (email) setSubmitted(true); }}
-            >
+            <form className="flex flex-col sm:flex-row gap-3" onSubmit={handleSubmit}>
               <input
                 type="email"
                 value={email}
@@ -194,10 +195,11 @@ function NewsletterSection() {
               />
               <button
                 type="submit"
-                className="rounded-full px-8 py-4 transition-all duration-300 hover:scale-[1.02] hover:brightness-105 whitespace-nowrap"
+                disabled={subscribe.isPending}
+                className="rounded-full px-8 py-4 transition-all duration-300 hover:scale-[1.02] hover:brightness-105 whitespace-nowrap disabled:opacity-60"
                 style={{ background: "var(--accent-gold)", color: "var(--deep-forest)", fontFamily: "'DM Sans', sans-serif", fontWeight: 600, fontSize: "15px" }}
               >
-                Subscribe →
+                {subscribe.isPending ? "Subscribing…" : "Subscribe →"}
               </button>
             </form>
             <p className="mt-4" style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "13px", color: "var(--stone-grey)" }}>
@@ -238,8 +240,6 @@ export default function Landing() {
 
   return (
     <div style={{ background: "var(--ivory-paper)" }}>
-      <Navbar />
-
       {/* ── HERO ── */}
       <section id="hero" ref={heroRef} className="relative min-h-screen flex items-center justify-center overflow-hidden">
         <div
@@ -268,7 +268,7 @@ export default function Landing() {
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 animate-blur-in" style={{ animationDelay: "0.8s", opacity: 0 }}>
             <button
-              onClick={() => router.push("/dashboard")}
+              onClick={() => router.push("/login")}
               className="group flex items-center gap-3 rounded-full px-8 py-4 transition-all duration-300 hover:scale-[1.02] hover:brightness-105"
               style={{ background: "var(--accent-gold)", color: "var(--deep-forest)", fontFamily: "'DM Sans', sans-serif", fontWeight: 600, fontSize: "16px" }}
             >
@@ -298,7 +298,6 @@ export default function Landing() {
       <TestimonialsSection />
       <CTABanner />
       <NewsletterSection />
-      <Footer />
     </div>
   );
 }

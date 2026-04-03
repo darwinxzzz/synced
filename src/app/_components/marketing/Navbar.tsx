@@ -122,7 +122,7 @@ export function Navbar() {
             {/* Right — Login + Request Demo */}
             <div style={{ display: "flex", alignItems: "center", gap: "10px", flexShrink: 0 }}>
               <button
-                onClick={() => router.push("/dashboard")}
+                onClick={() => router.push("/login")}
                 style={{
                   padding: "8px 20px",
                   borderRadius: "999px",
@@ -148,7 +148,7 @@ export function Navbar() {
                 Login
               </button>
               <button
-                onClick={() => router.push("/dashboard")}
+                onClick={() => router.push("/login")}
                 style={{
                   padding: "8px 20px",
                   borderRadius: "999px",
