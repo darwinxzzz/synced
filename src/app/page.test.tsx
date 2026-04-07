@@ -37,7 +37,7 @@ vi.mock("~/trpc/react", () => ({
   },
 }));
 
-import Landing from "./_components/marketing/page";
+import Landing from "./_components/marketing/Landing";
 
 describe("/ (home route)", () => {
   beforeEach(() => {

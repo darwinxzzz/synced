@@ -12,40 +12,55 @@ interface UpcomingMeeting {
   }[]
 }
 
+type EventRef = { name: string; date: string | null } | null
+
 export const dashboardRouter = createTRPCRouter({
 
   getMemberKPIs: protectedProcedure.query(async ({ ctx }) => {
-    const [tasksRes, rateRes, deadlineRes] = await Promise.all([
+    const [tasksRes, rateRes, deadlineRes, syncRes] = await Promise.all([
       ctx.supabase.rpc("get_member_kpi_remaining_tasks"),
       ctx.supabase.rpc("get_member_kpi_completion_rate"),
       ctx.supabase.rpc("get_member_kpi_next_deadline"),
+      ctx.supabase.rpc("get_member_kpi_team_sync_count"),
     ])
 
-    if (tasksRes.error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: tasksRes.error.message })
-    if (rateRes.error)  throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: rateRes.error.message })
+    if (tasksRes.error)    throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: tasksRes.error.message })
+    if (rateRes.error)     throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: rateRes.error.message })
     if (deadlineRes.error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: deadlineRes.error.message })
+    if (syncRes.error)     throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: syncRes.error.message })
 
     const deadlines = deadlineRes.data as { days_away: number; event_date: string; event_name: string }[]
 
     return {
-      remainingTasks:  Number(tasksRes.data),
-      completionRate:  Number(rateRes.data),
-      nextDeadline:    deadlines?.[0] ?? null,
+      remainingTasks: Number(tasksRes.data),
+      completionRate: Number(rateRes.data),
+      teamSyncCount:  Number(syncRes.data),
+      nextDeadline:   deadlines?.[0] ?? null,
     }
   }),
 
   getPendingMilestones: protectedProcedure.query(async ({ ctx }) => {
-    const { data, error } = await ctx.supabase.rpc("get_member_pending_milestones")
+    const { data, error } = await ctx.supabase
+      .from("event_members")
+      .select("id, department, task, pillar_status, event_id, events(name, date)")
+      .eq("user_id", ctx.user.id)
+      .neq("pillar_status", "done")
+      .order("created_at", { ascending: true })
 
     if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message })
-    return (data ?? []) as {
-      department:   string
-      task:         string
-      event_name:   string
-      event_id:     string
-      event_date:   string
-      pillar_status: string
-    }[]
+
+    return (data ?? []).map((m) => {
+      const event = m.events as unknown as EventRef
+      return {
+        task_id:       m.id,
+        department:    m.department ?? "",
+        task:          m.task ?? "",
+        event_name:    event?.name ?? "",
+        event_id:      m.event_id,
+        event_date:    event?.date ?? "",
+        pillar_status: m.pillar_status,
+      }
+    })
   }),
 
   getUpcomingMeeting: protectedProcedure.query(async ({ ctx }) => {
@@ -62,5 +77,41 @@ export const dashboardRouter = createTRPCRouter({
     if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message })
 
     return data as unknown as UpcomingMeeting
+  }),
+
+  getMyProfile: protectedProcedure.query(async ({ ctx }) => {
+    const { data, error } = await ctx.supabase
+      .from("profiles")
+      .select("id, name, email, department, role, avatar_url, joined_date")
+      .eq("id", ctx.user.id)
+      .single()
+
+    if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message })
+    if (!data) throw new TRPCError({ code: "NOT_FOUND", message: "Profile not found" })
+
+    return {
+      id:          data.id,
+      name:        data.name,
+      email:       data.email,
+      department:  data.department,
+      role:        data.role,
+      avatar_url:  data.avatar_url,
+      joined_date: data.joined_date,
+    }
+  }),
+
+  getReflectionStreak: protectedProcedure.query(async ({ ctx }) => {
+    const { count, error } = await ctx.supabase
+      .from("reflections")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", ctx.user.id)
+
+    if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message })
+
+    const streakCount = count ?? 0
+    return {
+      streakCount,
+      streakPercent: Math.min(streakCount * 10, 100),
+    }
   }),
 })

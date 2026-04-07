@@ -14,7 +14,13 @@
       "mcp__stitch__list_screens",
       "mcp__stitch__list_projects",
       "Bash(npx next:*)",
-      "Bash(python -c \"import json,sys; screens=json.load\\(sys.stdin\\)['screens']; [print\\(s['name'], '|', s.get\\('displayName',''\\)\\) for s in screens]\")"
+      "Bash(python -c \"import json,sys; screens=json.load\\(sys.stdin\\)['screens']; [print\\(s['name'], '|', s.get\\('displayName',''\\)\\) for s in screens]\")",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(json.dumps\\({k:v for k,v in d.items\\(\\) if k != 'hooks'}, indent=2\\)\\)\")",
+      "Bash(npm run:*)"
     ]
-  }
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "claude-flow"
+  ]
 }

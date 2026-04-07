@@ -1,8 +1,11 @@
 "use client"
 
+import { useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { LayoutDashboard, Kanban, Star } from "lucide-react"
+import { LayoutDashboard, Kanban, Star, Bell } from "lucide-react"
+import { api } from "~/trpc/react"
+import { MemberProfileDrawer } from "~/app/_components/shared/MemberProfileDrawer"
 
 const NAV_LINKS = [
   { href: "/member/dashboard",    label: "Dashboard",    icon: LayoutDashboard },
@@ -10,8 +13,19 @@ const NAV_LINKS = [
   { href: "/member/testimonials", label: "Testimonials", icon: Star },
 ]
 
+function getInitials(name: string): string {
+  return name
+    .split(" ")
+    .slice(0, 2)
+    .map((n) => n[0]?.toUpperCase() ?? "")
+    .join("")
+}
+
 export default function MemberLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
+  const [profileOpen, setProfileOpen] = useState(false)
+
+  const { data: profile } = api.dashboard.getMyProfile.useQuery()
 
   return (
     <div className="min-h-screen flex flex-col" style={{ backgroundColor: "var(--ivory-paper)" }}>
@@ -60,7 +74,81 @@ export default function MemberLayout({ children }: { children: React.ReactNode }
           })}
         </nav>
 
-        <div className="ml-auto" />
+        {/* Right: Bell + Avatar */}
+        <div className="ml-auto flex items-center gap-3">
+          {/* Bell icon */}
+          <button
+            aria-label="Notifications"
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: "50%",
+              border: "none",
+              background: "transparent",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "var(--stone-grey)",
+              transition: "background 0.2s",
+            }}
+            onMouseEnter={(e) =>
+              (e.currentTarget.style.background = "rgba(168,197,160,0.20)")
+            }
+            onMouseLeave={(e) =>
+              (e.currentTarget.style.background = "transparent")
+            }
+          >
+            <Bell size={20} />
+          </button>
+
+          {/* Avatar button */}
+          <button
+            onClick={() => setProfileOpen(true)}
+            aria-label="Open profile"
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: "50%",
+              border: "2px solid var(--sage-mist)",
+              background: profile?.avatar_url ? "transparent" : "var(--bamboo-green)",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              overflow: "hidden",
+              padding: 0,
+              transition: "border-color 0.2s",
+              flexShrink: 0,
+            }}
+            onMouseEnter={(e) =>
+              (e.currentTarget.style.borderColor = "var(--bamboo-green)")
+            }
+            onMouseLeave={(e) =>
+              (e.currentTarget.style.borderColor = "var(--sage-mist)")
+            }
+          >
+            {profile?.avatar_url ? (
+              <img
+                src={profile.avatar_url}
+                alt={profile.name}
+                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+              />
+            ) : (
+              <span
+                style={{
+                  color: "#fff",
+                  fontFamily: "'DM Sans', sans-serif",
+                  fontSize: 13,
+                  fontWeight: 700,
+                  lineHeight: 1,
+                }}
+              >
+                {profile ? getInitials(profile.name) : "…"}
+              </span>
+            )}
+          </button>
+        </div>
       </header>
 
       {/* ── Page content ────────────────────────────────────────────────────── */}
@@ -100,6 +188,13 @@ export default function MemberLayout({ children }: { children: React.ReactNode }
           )
         })}
       </nav>
+
+      {/* ── Member Profile Drawer ────────────────────────────────────────────── */}
+      <MemberProfileDrawer
+        isOpen={profileOpen}
+        onClose={() => setProfileOpen(false)}
+        profile={profile}
+      />
     </div>
   )
 }

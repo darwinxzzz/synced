@@ -28,7 +28,8 @@ export async function GET(request: Request) {
         return NextResponse.redirect(`${origin}/login?error=not_registered`)
       }
 
-      const dest = profile.role === 'admin' ? '/admin/dashboard' : '/member/dashboard'
+      // TODO: redirect admins to /admin/dashboard once that page is built
+      const dest = '/member/dashboard'
       return NextResponse.redirect(`${origin}${dest}`)
     }
   }

@@ -67,7 +67,8 @@ export async function middleware(request: NextRequest) {
       .eq('id', user.id)
       .single()
 
-    const dest = profile?.role === 'admin' ? '/admin/dashboard' : '/member/dashboard'
+    // TODO: redirect admins to /admin/dashboard once that page is built
+    const dest = '/member/dashboard'
     const url = request.nextUrl.clone()
     url.pathname = dest
     return NextResponse.redirect(url)

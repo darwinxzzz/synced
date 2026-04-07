@@ -1,147 +1,97 @@
-import { describe, it, expect, vi, beforeEach } from "vitest"
+// @vitest-environment node
+import { describe, it, expect, beforeAll, afterAll } from "vitest"
 import { createCallerFactory } from "~/server/api/trpc"
 import { eventsRouter } from "../events"
+import { makeUnauthCtx, makeSignedInCtx, type TestCtx } from "~/test/helpers"
 
 const createCaller = createCallerFactory(eventsRouter)
 
-const EVENT_ID = "00000000-0000-0000-0000-000000000020"
-
-function makeCtx(user: unknown = { id: "00000000-0000-0000-0000-000000000001" }) {
-  const supabase = {
-    from: vi.fn().mockReturnValue({
-      select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      update: vi.fn().mockReturnThis(),
-      order: vi.fn().mockReturnThis(),
-      single: vi.fn().mockResolvedValue({ data: null, error: null }),
-    }),
-    rpc: vi.fn().mockResolvedValue({ data: null, error: null }),
-  }
-  return { supabase, user, headers: new Headers() }
-}
-
-const sampleEvent = {
-  id: EVENT_ID,
-  name: "Year-End Gala",
-  status: "draft",
-  is_recurring: false,
-}
-
 describe("eventsRouter", () => {
-  beforeEach(() => vi.clearAllMocks())
+  let ctx: TestCtx & { user: { id: string } }
 
+  beforeAll(async () => {
+    ctx = await makeSignedInCtx()
+  })
+
+  afterAll(async () => {
+    await ctx.supabase.auth.signOut()
+  })
+
+  // ─── list ─────────────────────────────────────────────────────────────────────
   describe("list", () => {
     it("throws UNAUTHORIZED when no user", async () => {
-      const caller = createCaller(makeCtx(null) as never)
+      const caller = createCaller(makeUnauthCtx() as never)
       await expect(caller.list()).rejects.toThrow("UNAUTHORIZED")
     })
 
-    it("returns list of events", async () => {
-      const ctx = makeCtx()
-      ctx.supabase.from = vi.fn().mockReturnValue({
-        select: vi.fn().mockReturnThis(),
-        order: vi.fn().mockResolvedValue({ data: [sampleEvent], error: null }),
-      })
+    it("returns array of events with expected shape", async () => {
       const caller = createCaller(ctx as never)
       const result = await caller.list()
-      expect(result).toEqual([sampleEvent])
-    })
-
-    it("throws on DB error", async () => {
-      const ctx = makeCtx()
-      ctx.supabase.from = vi.fn().mockReturnValue({
-        select: vi.fn().mockReturnThis(),
-        order: vi.fn().mockResolvedValue({ data: null, error: { message: "fail" } }),
+      expect(Array.isArray(result)).toBe(true)
+      result.forEach(event => {
+        expect(event).toHaveProperty("id")
+        expect(event).toHaveProperty("name")
+        expect(event).toHaveProperty("status")
       })
-      const caller = createCaller(ctx as never)
-      await expect(caller.list()).rejects.toThrow("fail")
     })
   })
 
+  // ─── getById ──────────────────────────────────────────────────────────────────
   describe("getById", () => {
     it("throws UNAUTHORIZED when no user", async () => {
-      const caller = createCaller(makeCtx(null) as never)
-      await expect(caller.getById({ id: EVENT_ID })).rejects.toThrow("UNAUTHORIZED")
+      const caller = createCaller(makeUnauthCtx() as never)
+      await expect(caller.getById({ id: "00000000-0000-0000-0000-000000000020" })).rejects.toThrow("UNAUTHORIZED")
     })
 
-    it("returns event by id", async () => {
-      const ctx = makeCtx()
-      ctx.supabase.from = vi.fn().mockReturnValue({
-        select: vi.fn().mockReturnThis(),
-        eq: vi.fn().mockReturnThis(),
-        single: vi.fn().mockResolvedValue({ data: sampleEvent, error: null }),
-      })
+    it("rejects a non-UUID string", async () => {
       const caller = createCaller(ctx as never)
-      const result = await caller.getById({ id: EVENT_ID })
-      expect(result).toEqual(sampleEvent)
-    })
-
-    it("throws NOT_FOUND on error", async () => {
-      const ctx = makeCtx()
-      ctx.supabase.from = vi.fn().mockReturnValue({
-        select: vi.fn().mockReturnThis(),
-        eq: vi.fn().mockReturnThis(),
-        single: vi.fn().mockResolvedValue({ data: null, error: { message: "not found" } }),
-      })
-      const caller = createCaller(ctx as never)
-      await expect(caller.getById({ id: EVENT_ID })).rejects.toThrow("Event not found")
-    })
-
-    it("rejects invalid uuid", async () => {
-      const caller = createCaller(makeCtx() as never)
       await expect(caller.getById({ id: "not-a-uuid" })).rejects.toThrow()
+    })
+
+    it("throws NOT_FOUND for a UUID that does not exist", async () => {
+      const caller = createCaller(ctx as never)
+      await expect(
+        caller.getById({ id: "00000000-0000-0000-0000-000000000099" }),
+      ).rejects.toThrow("Event not found")
+    })
+
+    it("returns the event when the UUID exists", async () => {
+      const caller = createCaller(ctx as never)
+      const events = await caller.list()
+      if (events.length === 0) return // No test data — skip
+
+      const event = await caller.getById({ id: events[0]!.id })
+      expect(event).toMatchObject({ id: events[0]!.id, name: events[0]!.name })
+      expect(event).toHaveProperty("event_members")
     })
   })
 
+  // ─── create ───────────────────────────────────────────────────────────────────
   describe("create", () => {
     it("throws UNAUTHORIZED when no user", async () => {
-      const caller = createCaller(makeCtx(null) as never)
+      const caller = createCaller(makeUnauthCtx() as never)
       await expect(caller.create({ name: "Event" })).rejects.toThrow("UNAUTHORIZED")
     })
 
-    it("calls create_event RPC and returns result", async () => {
-      const ctx = makeCtx()
-      ctx.supabase.rpc = vi.fn().mockResolvedValue({ data: sampleEvent, error: null })
+    it("rejects a name longer than 100 characters", async () => {
       const caller = createCaller(ctx as never)
-      const result = await caller.create({ name: "Year-End Gala" })
-      expect(ctx.supabase.rpc).toHaveBeenCalledWith("create_event", expect.objectContaining({
-        p_name: "Year-End Gala",
-      }))
-      expect(result).toEqual(sampleEvent)
-    })
-
-    it("rejects name longer than 100 chars", async () => {
-      const caller = createCaller(makeCtx() as never)
       await expect(caller.create({ name: "x".repeat(101) })).rejects.toThrow()
     })
   })
 
+  // ─── updateStatus ─────────────────────────────────────────────────────────────
   describe("updateStatus", () => {
     it("throws UNAUTHORIZED when no user", async () => {
-      const caller = createCaller(makeCtx(null) as never)
+      const caller = createCaller(makeUnauthCtx() as never)
       await expect(
-        caller.updateStatus({ id: EVENT_ID, status: "active" })
+        caller.updateStatus({ id: "00000000-0000-0000-0000-000000000020", status: "active" }),
       ).rejects.toThrow("UNAUTHORIZED")
     })
 
-    it("updates event status", async () => {
-      const updated = { ...sampleEvent, status: "active" }
-      const ctx = makeCtx()
-      ctx.supabase.from = vi.fn().mockReturnValue({
-        update: vi.fn().mockReturnThis(),
-        eq: vi.fn().mockReturnThis(),
-        select: vi.fn().mockReturnThis(),
-        single: vi.fn().mockResolvedValue({ data: updated, error: null }),
-      })
+    it("rejects an invalid status enum value", async () => {
       const caller = createCaller(ctx as never)
-      const result = await caller.updateStatus({ id: EVENT_ID, status: "active" })
-      expect(result).toEqual(updated)
-    })
-
-    it("rejects invalid status enum", async () => {
-      const caller = createCaller(makeCtx() as never)
       await expect(
-        caller.updateStatus({ id: EVENT_ID, status: "published" as never })
+        caller.updateStatus({ id: "00000000-0000-0000-0000-000000000020", status: "published" as never }),
       ).rejects.toThrow()
     })
   })

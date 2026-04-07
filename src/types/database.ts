@@ -381,6 +381,7 @@ Functions: {
         Returns: { days_away: number; event_date: string; event_name: string }[]
       }
       get_member_kpi_remaining_tasks: { Args: Record<string, never>; Returns: number }
+      get_member_kpi_team_sync_count: { Args: Record<string, never>; Returns: number }
       get_member_pending_milestones: {
         Args: Record<string, never>
         Returns: {

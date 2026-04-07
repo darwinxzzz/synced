@@ -3,8 +3,9 @@ import { attendanceRouter } from "~/server/api/routers/attendance";
 import { contributionsRouter } from "~/server/api/routers/contributions";
 import { dashboardRouter } from "~/server/api/routers/dashboard";
 import { eventsRouter } from "~/server/api/routers/events";
+import { kanbanRouter } from "~/server/api/routers/kanban";
 import { newsletterRouter } from "~/server/api/routers/newsletter";
-import { createCallerFactory, createTRPCRouter } from "~/server/api/trpc";
+import { createTRPCRouter } from "~/server/api/trpc";
 
 export const appRouter = createTRPCRouter({
   auth: authRouter,
@@ -12,9 +13,8 @@ export const appRouter = createTRPCRouter({
   contributions: contributionsRouter,
   dashboard: dashboardRouter,
   events: eventsRouter,
+  kanban: kanbanRouter,
   newsletter: newsletterRouter,
 });
 
 export type AppRouter = typeof appRouter;
-
-export const createCaller = createCallerFactory(appRouter);

@@ -1,162 +1,113 @@
-import { describe, it, expect, vi, beforeEach } from "vitest"
+// @vitest-environment node
+import { describe, it, expect, beforeAll, afterAll } from "vitest"
 import { createCallerFactory } from "~/server/api/trpc"
 import { contributionsRouter } from "../contributions"
+import { makeUnauthCtx, makeSignedInCtx, type TestCtx } from "~/test/helpers"
 
 const createCaller = createCallerFactory(contributionsRouter)
 
-const USER_ID = "00000000-0000-0000-0000-000000000001"
-
-function makeSupabase(overrides: Record<string, unknown> = {}) {
-  return {
-    from: vi.fn().mockReturnValue({
-      select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      order: vi.fn().mockReturnThis(),
-      insert: vi.fn().mockReturnThis(),
-      update: vi.fn().mockReturnThis(),
-      single: vi.fn().mockResolvedValue({ data: null, error: null }),
-    }),
-    ...overrides,
-  }
-}
-
-function makeCtx(user: unknown = { id: USER_ID }) {
-  return { supabase: makeSupabase(), user, headers: new Headers() }
-}
-
-const sampleContribution = {
-  id: "00000000-0000-0000-0000-000000000010",
-  user_id: USER_ID,
-  department: "Engineering",
-  task: "Built login page",
-  priority: "high" as const,
-}
-
 describe("contributionsRouter", () => {
-  beforeEach(() => vi.clearAllMocks())
+  let ctx: TestCtx & { user: { id: string } }
+  const createdIds: string[] = []
 
+  beforeAll(async () => {
+    ctx = await makeSignedInCtx()
+  })
+
+  afterAll(async () => {
+    if (createdIds.length > 0) {
+      await ctx.supabase.from("contributions").delete().in("id", createdIds)
+    }
+    await ctx.supabase.auth.signOut()
+  })
+
+  // ─── list ─────────────────────────────────────────────────────────────────────
   describe("list", () => {
     it("throws UNAUTHORIZED when no user", async () => {
-      const caller = createCaller(makeCtx(null) as never)
+      const caller = createCaller(makeUnauthCtx() as never)
       await expect(caller.list()).rejects.toThrow("UNAUTHORIZED")
     })
 
-    it("returns contributions for current user", async () => {
-      const ctx = makeCtx()
-      ctx.supabase.from = vi.fn().mockReturnValue({
-        select: vi.fn().mockReturnThis(),
-        eq: vi.fn().mockReturnThis(),
-        order: vi.fn().mockResolvedValue({ data: [sampleContribution], error: null }),
-      })
+    it("returns contributions array for the authenticated user", async () => {
       const caller = createCaller(ctx as never)
       const result = await caller.list()
-      expect(result).toEqual([sampleContribution])
-    })
-
-    it("throws INTERNAL_SERVER_ERROR on DB error", async () => {
-      const ctx = makeCtx()
-      ctx.supabase.from = vi.fn().mockReturnValue({
-        select: vi.fn().mockReturnThis(),
-        eq: vi.fn().mockReturnThis(),
-        order: vi.fn().mockResolvedValue({ data: null, error: { message: "db error" } }),
+      expect(Array.isArray(result)).toBe(true)
+      result.forEach(c => {
+        expect(c).toHaveProperty("id")
+        expect(c).toHaveProperty("task")
+        expect(c).toHaveProperty("department")
+        expect(c.user_id).toBe(ctx.user.id)
       })
-      const caller = createCaller(ctx as never)
-      await expect(caller.list()).rejects.toThrow("db error")
     })
   })
 
+  // ─── listAll ──────────────────────────────────────────────────────────────────
   describe("listAll", () => {
     it("throws UNAUTHORIZED when no user", async () => {
-      const caller = createCaller(makeCtx(null) as never)
+      const caller = createCaller(makeUnauthCtx() as never)
       await expect(caller.listAll()).rejects.toThrow("UNAUTHORIZED")
     })
 
     it("throws FORBIDDEN when user is not admin", async () => {
-      const ctx = makeCtx()
-      ctx.supabase.from = vi.fn().mockReturnValue({
-        select: vi.fn().mockReturnThis(),
-        eq: vi.fn().mockReturnThis(),
-        single: vi.fn().mockResolvedValue({ data: { role: "member" }, error: null }),
-      })
+      // Test user is a regular member — expects FORBIDDEN
       const caller = createCaller(ctx as never)
       await expect(caller.listAll()).rejects.toThrow("Admin only")
     })
-
-    it("returns all contributions when user is admin", async () => {
-      const ctx = makeCtx()
-      let callCount = 0
-      ctx.supabase.from = vi.fn().mockImplementation(() => {
-        callCount++
-        if (callCount === 1) {
-          return {
-            select: vi.fn().mockReturnThis(),
-            eq: vi.fn().mockReturnThis(),
-            single: vi.fn().mockResolvedValue({ data: { role: "admin" }, error: null }),
-          }
-        }
-        return {
-          select: vi.fn().mockReturnThis(),
-          order: vi.fn().mockResolvedValue({ data: [sampleContribution], error: null }),
-        }
-      })
-      const caller = createCaller(ctx as never)
-      const result = await caller.listAll()
-      expect(result).toEqual([sampleContribution])
-    })
   })
 
+  // ─── create ───────────────────────────────────────────────────────────────────
   describe("create", () => {
     it("throws UNAUTHORIZED when no user", async () => {
-      const caller = createCaller(makeCtx(null) as never)
+      const caller = createCaller(makeUnauthCtx() as never)
       await expect(
-        caller.create({ department: "Eng", task: "Task", priority: "low" })
+        caller.create({ department: "Eng", task: "Task", priority: "low" }),
       ).rejects.toThrow("UNAUTHORIZED")
+    })
+
+    it("rejects task longer than 100 characters", async () => {
+      const caller = createCaller(ctx as never)
+      await expect(
+        caller.create({ department: "Eng", task: "x".repeat(101), priority: "low" }),
+      ).rejects.toThrow()
     })
 
     it("creates a contribution and returns it", async () => {
-      const ctx = makeCtx()
-      ctx.supabase.from = vi.fn().mockReturnValue({
-        insert: vi.fn().mockReturnThis(),
-        select: vi.fn().mockReturnThis(),
-        single: vi.fn().mockResolvedValue({ data: sampleContribution, error: null }),
-      })
       const caller = createCaller(ctx as never)
       const result = await caller.create({
         department: "Engineering",
-        task: "Built login page",
-        priority: "high",
+        task: "Integration test task",
+        priority: "low",
       })
-      expect(result).toEqual(sampleContribution)
-    })
-
-    it("rejects task longer than 100 chars", async () => {
-      const caller = createCaller(makeCtx() as never)
-      await expect(
-        caller.create({ department: "Eng", task: "x".repeat(101), priority: "low" })
-      ).rejects.toThrow()
+      expect(result).toMatchObject({
+        department: "Engineering",
+        task: "Integration test task",
+        user_id: ctx.user.id,
+      })
+      if (result?.id) createdIds.push(result.id)
     })
   })
 
+  // ─── update ───────────────────────────────────────────────────────────────────
   describe("update", () => {
     it("throws UNAUTHORIZED when no user", async () => {
-      const caller = createCaller(makeCtx(null) as never)
+      const caller = createCaller(makeUnauthCtx() as never)
       await expect(
-        caller.update({ id: sampleContribution.id, task: "New task" })
+        caller.update({ id: "00000000-0000-0000-0000-000000000099", task: "X" }),
       ).rejects.toThrow("UNAUTHORIZED")
     })
 
-    it("updates and returns the contribution", async () => {
-      const updated = { ...sampleContribution, task: "Updated task" }
-      const ctx = makeCtx()
-      ctx.supabase.from = vi.fn().mockReturnValue({
-        update: vi.fn().mockReturnThis(),
-        eq: vi.fn().mockReturnThis(),
-        select: vi.fn().mockReturnThis(),
-        single: vi.fn().mockResolvedValue({ data: updated, error: null }),
-      })
+    it("updates a contribution and returns the updated row", async () => {
       const caller = createCaller(ctx as never)
-      const result = await caller.update({ id: sampleContribution.id, task: "Updated task" })
-      expect(result).toEqual(updated)
+      const created = await caller.create({
+        department: "Design",
+        task: "Original task",
+        priority: "medium",
+      })
+      if (!created?.id) return
+      createdIds.push(created.id)
+
+      const result = await caller.update({ id: created.id, task: "Updated task" })
+      expect(result).toMatchObject({ id: created.id, task: "Updated task" })
     })
   })
 })

@@ -14,8 +14,8 @@ export function DeadlineBadge({ daysAway }: DeadlineBadgeProps) {
     daysAway <= 0
       ? "Overdue"
       : daysAway === 1
-        ? "Due tomorrow"
-        : `Due in ${daysAway} days`
+        ? "1 Day"
+        : `${daysAway} Days`
 
   return (
     <span

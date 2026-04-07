@@ -29,19 +29,19 @@ function daysUntil(dateStr: string): number {
 }
 
 interface PendingMilestoneItemProps {
+  taskId:       string
   department:   string
   task:         string
   eventName:    string
-  eventId:      string
   eventDate:    string
   pillarStatus: string
 }
 
 export function PendingMilestoneItem({
+  taskId,
   department,
   task,
   eventName,
-  eventId,
   eventDate,
   pillarStatus,
 }: PendingMilestoneItemProps) {
@@ -51,7 +51,7 @@ export function PendingMilestoneItem({
 
   return (
     <Link
-      href={`/member/kanban?eventId=${eventId}`}
+      href={`/member/kanban?taskId=${taskId}`}
       className="flex items-center gap-4 py-4 border-b last:border-b-0 transition-colors group"
       style={{ borderColor: "rgba(45,45,45,0.07)" }}
     >
