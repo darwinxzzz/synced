@@ -16,7 +16,13 @@
       "Bash(npx next:*)",
       "Bash(python -c \"import json,sys; screens=json.load\\(sys.stdin\\)['screens']; [print\\(s['name'], '|', s.get\\('displayName',''\\)\\) for s in screens]\")",
       "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(json.dumps\\({k:v for k,v in d.items\\(\\) if k != 'hooks'}, indent=2\\)\\)\")",
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "Bash(npx supabase:*)",
+      "Bash(python -c ':*)",
+      "Bash(python -c \"import graphify; import inspect; print\\(inspect.getfile\\(graphify\\)\\)\")",
+      "Bash(python -c \"from graphify import viz; print\\('viz ok'\\)\")",
+      "Bash(python -c \"import graphify.export; print\\(dir\\(graphify.export\\)\\)\")",
+      "Bash(npm test:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

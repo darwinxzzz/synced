@@ -5,12 +5,14 @@ import { useSearchParams } from "next/navigation";
 import { Bell, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "~/trpc/react";
+import { createClient } from "~/lib/supabase/client";
 import { KanbanPillar } from "~/app/_components/kanban/KanbanPillar";
 import { InReviewModal } from "~/app/_components/kanban/InReviewModal";
 import { TaskDetailDrawer } from "~/app/_components/kanban/TaskDetailDrawer";
 import { EventSelectorDropdown } from "~/app/_components/kanban/EventSelectorDropdown";
 import { FilterPanel, type KanbanFilters } from "~/app/_components/kanban/FilterPanel";
 import { AddContributionDrawer } from "~/app/_components/kanban/AddContributionDrawer";
+import { ReflectionDrawer } from "~/app/_components/kanban/ReflectionDrawer";
 import type { KanbanTask } from "~/app/_components/kanban/KanbanCard";
 
 type PillarStatus = "new" | "in_progress" | "in_review" | "done";
@@ -58,6 +60,7 @@ export default function MemberKanbanPage() {
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [filters, setFilters] = useState<KanbanFilters>({ dateSort: null, priorityFilter: null });
   const [addContributionOpen, setAddContributionOpen] = useState(false);
+  const [reflectionDrawerOpen, setReflectionDrawerOpen] = useState(false);
   const [inReviewOpen, setInReviewOpen] = useState(false);
   const [pendingMoveTaskId, setPendingMoveTaskId] = useState<string | null>(null);
   const [detailTask, setDetailTask] = useState<KanbanTask | null>(null);
@@ -76,6 +79,7 @@ export default function MemberKanbanPage() {
   );
   const { data: reflectionCount = 0, refetch: refetchReflections } =
     api.kanban.getPendingReflectionCount.useQuery();
+  const { data: profile } = api.dashboard.getMyProfile.useQuery();
 
   // Mutations
   const moveTask = api.kanban.moveTask.useMutation({
@@ -102,10 +106,34 @@ export default function MemberKanbanPage() {
     }
   }, [highlightTaskId]);
 
-  // Supabase Realtime subscription
-  const supabaseRef = useRef<ReturnType<typeof api.useUtils> | null>(null);
   const utils = api.useUtils();
-  supabaseRef.current = utils;
+
+  // Supabase Realtime — kanban updates
+  useEffect(() => {
+    if (!selectedEventId) return;
+    const supabase = createClient();
+    const channel = supabase
+      .channel(`kanban-${selectedEventId}`)
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "event_members" }, () => {
+        void refetchTasks();
+      })
+      .subscribe();
+    return () => { void supabase.removeChannel(channel); };
+  }, [selectedEventId, refetchTasks]);
+
+  // Supabase Realtime — reflection badge
+  useEffect(() => {
+    const userId = profile?.id;
+    if (!userId) return;
+    const supabase = createClient();
+    const channel = supabase
+      .channel(`reflections-${userId}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "reflections", filter: `user_id=eq.${userId}` }, () => {
+        void refetchReflections();
+      })
+      .subscribe();
+    return () => { void supabase.removeChannel(channel); };
+  }, [profile?.id, refetchReflections]);
 
   // Group tasks by pillar
   const tasksByPillar = useMemo(() => {
@@ -298,6 +326,7 @@ export default function MemberKanbanPage() {
             <div style={{ display: "flex", alignItems: "center", gap: "10px", flexShrink: 0 }}>
               {/* Reflections badge */}
               <button
+                onClick={() => setReflectionDrawerOpen(true)}
                 style={{
                   position: "relative",
                   display: "flex",
@@ -476,6 +505,13 @@ export default function MemberKanbanPage() {
       <AddContributionDrawer
         open={addContributionOpen}
         onClose={() => setAddContributionOpen(false)}
+        eventId={selectedEventId}
+        onSuccess={() => void refetchTasks()}
+      />
+
+      <ReflectionDrawer
+        open={reflectionDrawerOpen}
+        onClose={() => setReflectionDrawerOpen(false)}
       />
 
       {/* Mobile: tap-to-move bottom sheet */}

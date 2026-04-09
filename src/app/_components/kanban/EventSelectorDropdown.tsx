@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { ChevronDown, CalendarDays } from "lucide-react";
 
-export interface EventOption {
+interface EventOption {
   id: string;
   name: string;
   date: string | null;

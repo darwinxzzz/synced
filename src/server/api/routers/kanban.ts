@@ -206,6 +206,22 @@ export const kanbanRouter = createTRPCRouter({
     return count ?? 0;
   }),
 
+  // ── Distinct department list (pulled from profiles) ─────────────────────
+  getDepartments: protectedProcedure.query(async ({ ctx }) => {
+    const { data, error } = await ctx.supabase
+      .from("profiles")
+      .select("department")
+      .not("department", "is", null);
+
+    if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+    const depts = [
+      ...new Set(
+        (data ?? []).map((d) => d.department).filter((dep): dep is string => dep !== null)
+      ),
+    ].sort();
+    return depts;
+  }),
+
   // ── Legacy: kept for existing tests ──────────────────────────────────────
   getMyTasks: protectedProcedure
     .input(z.object({ eventId: z.string().uuid().optional() }))

@@ -44,3 +44,17 @@ yarn-error.log*
 
 # idea files
 .idea
+
+# graphify analysis outputs
+.graphify_*.json
+.graphify_python
+graphify-out/
+
+# misc temp files
+1
+30
+{var
+}
+
+# claude-flow
+.claude/checkpoints.log

@@ -1,53 +1,35 @@
-import { useState, useRef } from "react";
-import { Paperclip, X } from "lucide-react";
+"use client";
+
+import { useState } from "react";
+import { ChevronDown } from "lucide-react";
 import { toast } from "sonner";
+import { api } from "~/trpc/react";
 import { SlideDrawer } from "../shared/SlideDrawer";
 
 type Priority = "low" | "medium" | "high";
 
-const PRIORITY_CONFIG: Record<
-  Priority,
-  { icon: string; label: string; bg: string; color: string; border: string }
-> = {
-  low: {
-    icon: "🌱",
-    label: "Low",
-    bg: "rgba(168,197,160,0.18)",
-    color: "var(--bamboo-green)",
-    border: "rgba(74,124,89,0.25)",
-  },
-  medium: {
-    icon: "🎋",
-    label: "Medium",
-    bg: "rgba(74,124,89,0.15)",
-    color: "var(--bamboo-green)",
-    border: "rgba(74,124,89,0.40)",
-  },
-  high: {
-    icon: "🔥",
-    label: "High",
-    bg: "rgba(212,145,74,0.15)",
-    color: "var(--deadline-amber)",
-    border: "rgba(212,145,74,0.40)",
-  },
-};
+const PRIORITY_OPTS: { value: Priority; label: string; color: string; activeBg: string }[] = [
+  { value: "low",    label: "Low",    color: "var(--deadline-green)", activeBg: "rgba(61,139,94,0.12)"  },
+  { value: "medium", label: "Medium", color: "var(--deadline-amber)", activeBg: "rgba(212,145,74,0.12)" },
+  { value: "high",   label: "High",   color: "var(--deadline-red)",   activeBg: "rgba(192,80,58,0.12)"  },
+];
 
-const labelStyle = {
+const labelStyle: React.CSSProperties = {
+  display: "block",
   fontFamily: "'DM Sans', sans-serif",
-  fontSize: "12px",
-  fontWeight: 600 as const,
-  color: "var(--stone-grey)",
-  letterSpacing: "0.08em",
-  textTransform: "uppercase" as const,
-  display: "block" as const,
-  marginBottom: "8px",
+  fontSize: "11px",
+  fontWeight: 700,
+  letterSpacing: "0.10em",
+  textTransform: "uppercase",
+  color: "var(--bamboo-green)",
+  marginBottom: "6px",
 };
 
 const inputStyle: React.CSSProperties = {
   width: "100%",
   padding: "10px 14px",
   borderRadius: "12px",
-  border: "1px solid rgba(74,124,89,0.2)",
+  border: "1px solid rgba(74,124,89,0.20)",
   background: "var(--ivory-paper)",
   fontFamily: "'DM Sans', sans-serif",
   fontSize: "14px",
@@ -57,71 +39,91 @@ const inputStyle: React.CSSProperties = {
   boxSizing: "border-box",
 };
 
+function countWords(text: string): number {
+  return text.trim() === "" ? 0 : text.trim().split(/\s+/).length;
+}
+
 interface AddContributionDrawerProps {
   open: boolean;
   onClose: () => void;
-  onSubmit?: (data: {
-    task: string;
-    description: string;
-    outcome: string;
-    priority: Priority;
-    file: File | null;
-  }) => void;
+  eventId: string | null;
+  onSuccess?: () => void;
 }
 
 export function AddContributionDrawer({
   open,
   onClose,
-  onSubmit,
+  eventId,
+  onSuccess,
 }: AddContributionDrawerProps) {
-  const [form, setForm] = useState({
-    task: "",
-    description: "",
-    outcome: "",
-    priority: "medium" as Priority,
-  });
+  const [department, setDepartment] = useState("");
+  const [deptOpen, setDeptOpen] = useState(false);
+  const [task, setTask] = useState("");
+  const [description, setDescription] = useState("");
+  const [outcome, setOutcome] = useState("");
+  const [priority, setPriority] = useState<Priority | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [file, setFile] = useState<File | null>(null);
-  const [submitted, setSubmitted] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  const { data: departments = [] } = api.kanban.getDepartments.useQuery(undefined, {
+    enabled: open,
+  });
+
+  const createContribution = api.contributions.create.useMutation();
+
+  const descWords = countWords(description);
+  const WORD_LIMIT = 30;
 
   const validate = () => {
     const e: Record<string, string> = {};
-    if (!form.task.trim()) e.task = "Task name is required";
-    if (!form.description.trim()) e.description = "Description is required";
-    else if (form.description.length > 400)
-      e.description = "Max 400 characters";
-    if (!form.outcome.trim()) e.outcome = "Outcome is required";
-    else if (form.outcome.length > 300) e.outcome = "Max 300 characters";
+    if (!department) e.department = "Department is required";
+    if (!task.trim()) e.task = "Task name is required";
+    if (descWords > WORD_LIMIT) e.description = `Max ${WORD_LIMIT} words`;
+    if (!outcome.trim()) e.outcome = "Outcome is required";
+    if (!priority) e.priority = "Priority is required";
     return e;
   };
 
-  const handleSubmit = () => {
-    const e = validate();
-    if (Object.keys(e).length) {
-      setErrors(e);
-      return;
-    }
-    onSubmit?.({ ...form, file });
-    setSubmitted(true);
-    setTimeout(() => {
-      toast.success("Your contribution has been logged! ✓", {
-        duration: 4000,
-        style: {
-          background: "var(--cream-white)",
-          color: "var(--leaf-green)",
-        },
-      });
-      handleClose();
-    }, 400);
+  const handleClose = () => {
+    setDepartment("");
+    setTask("");
+    setDescription("");
+    setOutcome("");
+    setPriority(null);
+    setErrors({});
+    setSubmitting(false);
+    onClose();
   };
 
-  const handleClose = () => {
-    setForm({ task: "", description: "", outcome: "", priority: "medium" });
-    setErrors({});
-    setFile(null);
-    setSubmitted(false);
-    onClose();
+  const handleSubmit = async () => {
+    const errs = validate();
+    if (Object.keys(errs).length) {
+      setErrors(errs);
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await createContribution.mutateAsync({
+        department,
+        task,
+        description: description.trim() || undefined,
+        outcome,
+        priority: priority!,
+        event_id: eventId ?? undefined,
+      });
+      toast.success("Contribution added 🎋");
+      onSuccess?.();
+      handleClose();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to submit";
+      toast.error(msg);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleLater = () => {
+    handleClose();
   };
 
   return (
@@ -129,264 +131,255 @@ export function AddContributionDrawer({
       open={open}
       onClose={handleClose}
       title="Add My Contribution"
-      subtitle="Log your individual contribution to the team. Your admin will review and update your task status."
+      subtitle="Log your individual contribution to the team."
       footer={
-        <div style={{ display: "flex", gap: "10px" }}>
+        <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
           <button
-            onClick={handleSubmit}
-            disabled={submitted}
+            onClick={handleLater}
+            style={{
+              background: "transparent",
+              border: "none",
+              cursor: "pointer",
+              fontFamily: "'DM Sans', sans-serif",
+              fontSize: "14px",
+              color: "var(--stone-grey)",
+              padding: "4px 8px",
+              flexShrink: 0,
+            }}
+          >
+            Complete Later
+          </button>
+          <button
+            onClick={() => void handleSubmit()}
+            disabled={submitting}
             style={{
               flex: 1,
-              padding: "11px 20px",
+              height: "48px",
               borderRadius: "12px",
               border: "none",
-              background: submitted ? "var(--sage-mist)" : "var(--bamboo-green)",
+              background: submitting ? "var(--sage-mist)" : "var(--deep-forest)",
               color: "#fff",
               fontFamily: "'DM Sans', sans-serif",
               fontSize: "14px",
               fontWeight: 600,
-              cursor: submitted ? "default" : "pointer",
-              transition: "all 0.2s",
+              cursor: submitting ? "default" : "pointer",
+              transition: "background 0.2s",
             }}
-            onMouseEnter={(e) => {
-              if (!submitted)
-                e.currentTarget.style.background = "var(--deep-forest)";
-            }}
-            onMouseLeave={(e) => {
-              if (!submitted)
-                e.currentTarget.style.background = "var(--bamboo-green)";
-            }}
+            onMouseEnter={(e) => { if (!submitting) e.currentTarget.style.background = "var(--bamboo-green)"; }}
+            onMouseLeave={(e) => { if (!submitting) e.currentTarget.style.background = "var(--deep-forest)"; }}
           >
-            {submitted ? "Submitting…" : "Submit Contribution"}
-          </button>
-          <button
-            onClick={handleClose}
-            style={{
-              padding: "11px 20px",
-              borderRadius: "12px",
-              border: "1px solid rgba(140,140,140,0.25)",
-              background: "transparent",
-              color: "var(--stone-grey)",
-              fontFamily: "'DM Sans', sans-serif",
-              fontSize: "14px",
-              fontWeight: 600,
-              cursor: "pointer",
-            }}
-          >
-            Cancel
+            {submitting ? "Submitting…" : "Submit Contribution"}
           </button>
         </div>
       }
     >
       <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-        {/* Task */}
-        <div>
-          <label style={labelStyle}>Task *</label>
-          <input
-            style={{
-              ...inputStyle,
-              borderColor: errors.task
-                ? "var(--deadline-red)"
-                : "rgba(74,124,89,0.2)",
-            }}
-            placeholder="e.g. Software Technology — Feature"
-            value={form.task}
-            onChange={(e) => setForm((f) => ({ ...f, task: e.target.value }))}
-            onFocus={(e) =>
-              (e.currentTarget.style.borderColor = "var(--bamboo-green)")
-            }
-            onBlur={(e) =>
-              (e.currentTarget.style.borderColor = errors.task
-                ? "var(--deadline-red)"
-                : "rgba(74,124,89,0.2)")
-            }
-          />
-          {errors.task && (
-            <p style={{ fontSize: "12px", color: "var(--deadline-red)", fontFamily: "'DM Sans'", marginTop: "4px" }}>
-              {errors.task}
-            </p>
-          )}
+
+        {/* Department + Task row */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr auto 1fr",
+            gap: "10px",
+            alignItems: "start",
+          }}
+          className="contribution-header-row"
+        >
+          {/* Department dropdown */}
+          <div style={{ position: "relative" }}>
+            <label style={labelStyle}>Department *</label>
+            <button
+              type="button"
+              onClick={() => setDeptOpen((v) => !v)}
+              style={{
+                ...inputStyle,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                cursor: "pointer",
+                color: department ? "var(--charcoal-ink)" : "var(--stone-grey)",
+                borderColor: errors.department ? "var(--deadline-red)" : "rgba(74,124,89,0.20)",
+              }}
+            >
+              {department || "Department ▾"}
+              <ChevronDown
+                size={14}
+                color="var(--stone-grey)"
+                style={{ transform: deptOpen ? "rotate(180deg)" : "rotate(0)", transition: "transform 0.2s", flexShrink: 0 }}
+              />
+            </button>
+            {errors.department && (
+              <p style={{ fontSize: "11px", color: "var(--deadline-red)", fontFamily: "'DM Sans'", marginTop: "4px" }}>
+                {errors.department}
+              </p>
+            )}
+            {deptOpen && (
+              <div
+                className="card-shadow"
+                style={{
+                  position: "absolute",
+                  top: "calc(100% + 4px)",
+                  left: 0,
+                  right: 0,
+                  zIndex: 20,
+                  background: "var(--cream-white)",
+                  borderRadius: "12px",
+                  padding: "6px",
+                }}
+              >
+                {departments.map((d) => (
+                  <button
+                    key={d}
+                    type="button"
+                    onClick={() => { setDepartment(d); setDeptOpen(false); setErrors((e) => ({ ...e, department: "" })); }}
+                    style={{
+                      display: "block",
+                      width: "100%",
+                      padding: "9px 12px",
+                      borderRadius: "8px",
+                      border: "none",
+                      background: department === d ? "rgba(74,124,89,0.10)" : "transparent",
+                      fontFamily: "'DM Sans', sans-serif",
+                      fontSize: "13px",
+                      color: department === d ? "var(--bamboo-green)" : "var(--charcoal-ink)",
+                      fontWeight: department === d ? 600 : 400,
+                      cursor: "pointer",
+                      textAlign: "left",
+                      transition: "background 0.15s",
+                    }}
+                    onMouseEnter={(e) => { if (department !== d) e.currentTarget.style.background = "rgba(168,197,160,0.12)"; }}
+                    onMouseLeave={(e) => { if (department !== d) e.currentTarget.style.background = "transparent"; }}
+                  >
+                    {d}
+                  </button>
+                ))}
+                {departments.length === 0 && (
+                  <p style={{ fontFamily: "'DM Sans'", fontSize: "12px", color: "var(--stone-grey)", padding: "8px 12px" }}>
+                    No departments found
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Hyphen connector — hidden on mobile */}
+          <div
+            className="hidden sm:flex"
+            style={{ alignItems: "center", paddingTop: "28px", color: "var(--stone-grey)", fontFamily: "'DM Sans'", fontSize: "16px" }}
+          >
+            —
+          </div>
+
+          {/* Task name */}
+          <div>
+            <label style={labelStyle}>Task Name *</label>
+            <input
+              style={{
+                ...inputStyle,
+                borderColor: errors.task ? "var(--deadline-red)" : "rgba(74,124,89,0.20)",
+              }}
+              placeholder="e.g. Social Media Slides"
+              value={task}
+              onChange={(e) => setTask(e.target.value)}
+              onFocus={(e) => (e.currentTarget.style.borderColor = "var(--bamboo-green)")}
+              onBlur={(e) => (e.currentTarget.style.borderColor = errors.task ? "var(--deadline-red)" : "rgba(74,124,89,0.20)")}
+            />
+            {errors.task && (
+              <p style={{ fontSize: "11px", color: "var(--deadline-red)", fontFamily: "'DM Sans'", marginTop: "4px" }}>
+                {errors.task}
+              </p>
+            )}
+          </div>
         </div>
 
-        {/* Description */}
+        {/* Detailed Description */}
         <div>
-          <label style={labelStyle}>Description *</label>
+          <label style={labelStyle}>Detailed Description</label>
           <textarea
             style={{
               ...inputStyle,
-              minHeight: "100px",
+              minHeight: "88px",
               resize: "vertical",
-              borderColor: errors.description
-                ? "var(--deadline-red)"
-                : "rgba(74,124,89,0.2)",
+              borderColor: errors.description ? "var(--deadline-red)" : "rgba(74,124,89,0.20)",
             }}
-            placeholder="Describe what you did and how you contributed…"
-            value={form.description}
-            maxLength={400}
-            onChange={(e) =>
-              setForm((f) => ({ ...f, description: e.target.value }))
-            }
-            onFocus={(e) =>
-              (e.currentTarget.style.borderColor = "var(--bamboo-green)")
-            }
-            onBlur={(e) =>
-              (e.currentTarget.style.borderColor = errors.description
-                ? "var(--deadline-red)"
-                : "rgba(74,124,89,0.2)")
-            }
+            placeholder="30 words max…"
+            value={description}
+            rows={3}
+            onChange={(e) => setDescription(e.target.value)}
+            onFocus={(e) => (e.currentTarget.style.borderColor = "var(--bamboo-green)")}
+            onBlur={(e) => (e.currentTarget.style.borderColor = errors.description ? "var(--deadline-red)" : "rgba(74,124,89,0.20)")}
           />
           <div style={{ display: "flex", justifyContent: "space-between", marginTop: "4px" }}>
             {errors.description && (
-              <p style={{ fontSize: "12px", color: "var(--deadline-red)", fontFamily: "'DM Sans'" }}>{errors.description}</p>
+              <p style={{ fontSize: "11px", color: "var(--deadline-red)", fontFamily: "'DM Sans'" }}>{errors.description}</p>
             )}
-            <p style={{ fontSize: "11px", color: "var(--stone-grey)", fontFamily: "'DM Sans'", marginLeft: "auto" }}>{form.description.length}/400</p>
+            <p
+              style={{
+                fontSize: "11px",
+                fontFamily: "'DM Sans'",
+                marginLeft: "auto",
+                color: descWords > WORD_LIMIT ? "var(--deadline-red)" : "var(--stone-grey)",
+              }}
+            >
+              {descWords} / {WORD_LIMIT} words
+            </p>
           </div>
         </div>
 
-        {/* Outcome */}
+        {/* Aimed Result / Outcome */}
         <div>
-          <label style={labelStyle}>Outcome *</label>
+          <label style={labelStyle}>Aimed Result / Outcome *</label>
           <textarea
             style={{
               ...inputStyle,
-              minHeight: "80px",
+              minHeight: "88px",
               resize: "vertical",
-              borderColor: errors.outcome
-                ? "var(--deadline-red)"
-                : "rgba(74,124,89,0.2)",
+              borderColor: errors.outcome ? "var(--deadline-red)" : "rgba(74,124,89,0.20)",
             }}
-            placeholder="What was the result or impact of your contribution?"
-            value={form.outcome}
-            maxLength={300}
-            onChange={(e) =>
-              setForm((f) => ({ ...f, outcome: e.target.value }))
-            }
-            onFocus={(e) =>
-              (e.currentTarget.style.borderColor = "var(--bamboo-green)")
-            }
-            onBlur={(e) =>
-              (e.currentTarget.style.borderColor = errors.outcome
-                ? "var(--deadline-red)"
-                : "rgba(74,124,89,0.2)")
-            }
+            placeholder="Describe the intended result…"
+            value={outcome}
+            rows={3}
+            onChange={(e) => setOutcome(e.target.value)}
+            onFocus={(e) => (e.currentTarget.style.borderColor = "var(--bamboo-green)")}
+            onBlur={(e) => (e.currentTarget.style.borderColor = errors.outcome ? "var(--deadline-red)" : "rgba(74,124,89,0.20)")}
           />
-          <div style={{ display: "flex", justifyContent: "space-between", marginTop: "4px" }}>
-            {errors.outcome && (
-              <p style={{ fontSize: "12px", color: "var(--deadline-red)", fontFamily: "'DM Sans'" }}>{errors.outcome}</p>
-            )}
-            <p style={{ fontSize: "11px", color: "var(--stone-grey)", fontFamily: "'DM Sans'", marginLeft: "auto" }}>{form.outcome.length}/300</p>
-          </div>
+          {errors.outcome && (
+            <p style={{ fontSize: "11px", color: "var(--deadline-red)", fontFamily: "'DM Sans'", marginTop: "4px" }}>{errors.outcome}</p>
+          )}
         </div>
 
-        {/* Priority */}
+        {/* Priority Level */}
         <div>
           <label style={labelStyle}>Priority Level *</label>
           <div style={{ display: "flex", gap: "8px" }}>
-            {(["low", "medium", "high"] as Priority[]).map((p) => {
-              const cfg = PRIORITY_CONFIG[p];
-              const active = form.priority === p;
+            {PRIORITY_OPTS.map((opt) => {
+              const active = priority === opt.value;
               return (
                 <button
-                  key={p}
-                  onClick={() => setForm((f) => ({ ...f, priority: p }))}
+                  key={opt.value}
+                  type="button"
+                  onClick={() => { setPriority(opt.value); setErrors((e) => ({ ...e, priority: "" })); }}
                   style={{
                     flex: 1,
                     padding: "10px 8px",
                     borderRadius: "12px",
-                    border: `1.5px solid ${active ? cfg.border : "rgba(140,140,140,0.18)"}`,
-                    background: active ? cfg.bg : "transparent",
-                    color: active ? cfg.color : "var(--stone-grey)",
+                    border: `1.5px solid ${active ? opt.color : "rgba(140,140,140,0.18)"}`,
+                    background: active ? opt.activeBg : "transparent",
+                    color: active ? opt.color : "var(--stone-grey)",
                     fontFamily: "'DM Sans', sans-serif",
                     fontSize: "13px",
                     fontWeight: active ? 700 : 500,
                     cursor: "pointer",
                     transition: "all 0.2s",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: "6px",
                   }}
                 >
-                  <span>{cfg.icon}</span>
-                  {cfg.label}
+                  {opt.label}
                 </button>
               );
             })}
           </div>
-        </div>
-
-        {/* Attachment */}
-        <div>
-          <label style={labelStyle}>Attachment (Optional)</label>
-          <input
-            ref={fileRef}
-            type="file"
-            accept=".pdf,.png,.jpg,.jpeg,.docx"
-            style={{ display: "none" }}
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) {
-                if (f.size > 10 * 1024 * 1024) {
-                  toast.error("File must be under 10MB");
-                  return;
-                }
-                setFile(f);
-              }
-            }}
-          />
-          {file ? (
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "10px",
-                padding: "12px 14px",
-                borderRadius: "12px",
-                background: "rgba(74,124,89,0.08)",
-                border: "1px solid rgba(74,124,89,0.18)",
-              }}
-            >
-              <Paperclip size={15} color="var(--bamboo-green)" />
-              <span style={{ flex: 1, fontFamily: "'DM Sans', sans-serif", fontSize: "13px", color: "var(--charcoal-ink)" }}>
-                {file.name}
-              </span>
-              <button
-                onClick={() => setFile(null)}
-                style={{ background: "transparent", border: "none", cursor: "pointer", display: "flex" }}
-              >
-                <X size={14} color="var(--stone-grey)" />
-              </button>
-            </div>
-          ) : (
-            <button
-              onClick={() => fileRef.current?.click()}
-              style={{
-                width: "100%",
-                padding: "14px",
-                borderRadius: "12px",
-                border: "2px dashed rgba(74,124,89,0.25)",
-                background: "transparent",
-                cursor: "pointer",
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                gap: "6px",
-                transition: "all 0.2s",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = "rgba(168,197,160,0.10)";
-                e.currentTarget.style.borderColor = "rgba(74,124,89,0.45)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = "transparent";
-                e.currentTarget.style.borderColor = "rgba(74,124,89,0.25)";
-              }}
-            >
-              <Paperclip size={18} color="var(--sage-mist)" />
-              <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "13px", color: "var(--stone-grey)" }}>
-                PDF, PNG, JPG, DOCX — max 10MB
-              </p>
-            </button>
+          {errors.priority && (
+            <p style={{ fontSize: "11px", color: "var(--deadline-red)", fontFamily: "'DM Sans'", marginTop: "6px" }}>{errors.priority}</p>
           )}
         </div>
       </div>

@@ -39,6 +39,7 @@ Copy `.env.example` to `.env` and fill values:
 | `NEXT_PUBLIC_SUPABASE_URL` | Yes | Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | Supabase anon key (safe to expose; RLS still applies) |
 | `SUPABASE_SERVICE_ROLE_KEY` | Yes (server-only) | Privileged key for trusted server operations |
+| `GOOGLE_STITCH_API_KEY` | Yes (server-only, if using Stitch) | API key for Google Stitch integration |
 | `NODE_ENV` | Auto | `development`, `test`, or `production` |
 
 Schema validation source of truth: `src/env.js`.

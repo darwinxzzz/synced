@@ -5,6 +5,8 @@ import { dashboardRouter } from "~/server/api/routers/dashboard";
 import { eventsRouter } from "~/server/api/routers/events";
 import { kanbanRouter } from "~/server/api/routers/kanban";
 import { newsletterRouter } from "~/server/api/routers/newsletter";
+import { reflectionsRouter } from "~/server/api/routers/reflections";
+import { testimonialsRouter } from "~/server/api/routers/testimonials";
 import { createTRPCRouter } from "~/server/api/trpc";
 
 export const appRouter = createTRPCRouter({
@@ -15,6 +17,8 @@ export const appRouter = createTRPCRouter({
   events: eventsRouter,
   kanban: kanbanRouter,
   newsletter: newsletterRouter,
+  reflections: reflectionsRouter,
+  testimonials: testimonialsRouter,
 });
 
 export type AppRouter = typeof appRouter;
