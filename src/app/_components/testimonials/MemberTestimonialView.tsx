@@ -354,7 +354,7 @@ export function MemberTestimonialView({
                 marginBottom: "16px",
               }}
             >
-              "{endorsement.quote}"
+              &ldquo;{endorsement.quote}&rdquo;
             </p>
             <div
               style={{

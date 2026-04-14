@@ -144,7 +144,7 @@ export const kanbanRouter = createTRPCRouter({
           .from("contributions")
           .update(updatePayload)
           .eq("user_id", ctx.user.id)
-          .eq("event_id", row.event_id as string);
+          .eq("event_id", row.event_id);
       }
 
       // 3. Update pillar_status (DB trigger validates transition)

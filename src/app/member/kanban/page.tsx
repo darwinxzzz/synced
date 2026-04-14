@@ -1,5 +1,6 @@
 "use client";
 
+import { Suspense } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Bell, Plus } from "lucide-react";
@@ -53,7 +54,7 @@ function applySortAndFilter(tasks: KanbanTask[], filters: KanbanFilters): Kanban
   return result;
 }
 
-export default function MemberKanbanPage() {
+function KanbanBoard() {
   const searchParams = useSearchParams();
   const highlightTaskId = searchParams.get("taskId");
 
@@ -586,5 +587,13 @@ export default function MemberKanbanPage() {
         </>
       )}
     </div>
+  );
+}
+
+export default function MemberKanbanPage() {
+  return (
+    <Suspense>
+      <KanbanBoard />
+    </Suspense>
   );
 }

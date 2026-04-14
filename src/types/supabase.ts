@@ -13,12 +13,8 @@ export type Database = {
     PostgrestVersion: "14.5"
   }
   graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
+    Tables: Record<never, never>
+    Views: Record<never, never>
     Functions: {
       graphql: {
         Args: {
@@ -30,12 +26,8 @@ export type Database = {
         Returns: Json
       }
     }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
+    Enums: Record<never, never>
+    CompositeTypes: Record<never, never>
   }
   public: {
     Tables: {
@@ -455,9 +447,7 @@ export type Database = {
         ]
       }
     }
-    Views: {
-      [_ in never]: never
-    }
+    Views: Record<never, never>
     Functions: {
       create_event: {
         Args: {
@@ -543,9 +533,7 @@ export type Database = {
       roles: "admin" | "lead" | "member"
       status: "attended" | "excused" | "absent"
     }
-    CompositeTypes: {
-      [_ in never]: never
-    }
+    CompositeTypes: Record<never, never>
   }
 }
 
@@ -649,6 +637,7 @@ export type Enums<
     ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
     : never
 
+/* eslint-disable @typescript-eslint/no-redundant-type-constituents */
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
@@ -665,6 +654,7 @@ export type CompositeTypes<
   : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
     ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
     : never
+/* eslint-enable @typescript-eslint/no-redundant-type-constituents */
 
 export const Constants = {
   graphql_public: {
