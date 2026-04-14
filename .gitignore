@@ -51,10 +51,6 @@ yarn-error.log*
 graphify-out/
 
 # misc temp files
-1
-30
-{var
-}
 
 # claude-flow
 .claude/checkpoints.log

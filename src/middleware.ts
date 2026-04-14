@@ -1,7 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { type NextRequest, NextResponse } from 'next/server'
 
-// ─── In-memory rate limiter ───────────────────────────────────────────────────
+// In-memory rate limiter
 const rateLimitMap = new Map<string, { count: number; timestamp: number }>()
 
 function rateLimit(ip: string, limit: number, windowMs: number): boolean {
@@ -20,7 +20,7 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
   const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? '127.0.0.1'
 
-  // ─── Rate limiting ──────────────────────────────────────────────────────────
+  // Rate limiting
   const authRoute = pathname.startsWith('/auth') || pathname.startsWith('/login')
   const trpcRoute = pathname.startsWith('/api/trpc')
 
@@ -31,7 +31,7 @@ export async function middleware(request: NextRequest) {
     return new NextResponse('Too many requests', { status: 429 })
   }
 
-  // ─── Supabase session refresh ───────────────────────────────────────────────
+  // Supabase session refresh
   let supabaseResponse = NextResponse.next({ request })
 
   const supabase = createServerClient(
@@ -39,33 +39,70 @@ export async function middleware(request: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        getAll() { return request.cookies.getAll() },
+        getAll() {
+          return request.cookies.getAll()
+        },
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
           supabaseResponse = NextResponse.next({ request })
           cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
+            supabaseResponse.cookies.set(name, value, options),
           )
         },
       },
-    }
+    },
   )
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
 
-  // ─── Auth guards ────────────────────────────────────────────────────────────
-  if (!user && (pathname.startsWith('/member') || pathname.startsWith('/admin'))) {
+  const onProtectedAppRoute = pathname.startsWith('/member') || pathname.startsWith('/admin')
+
+  const redirectToLogin = (error?: string) => {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
+    if (error) {
+      url.searchParams.set('error', error)
+    }
     return NextResponse.redirect(url)
   }
 
-  if (user && pathname === '/login') {
+  // Auth guards
+  if (!user && onProtectedAppRoute) {
+    return redirectToLogin()
+  }
+
+  if (user && (onProtectedAppRoute || pathname === '/login')) {
     const { data: profile } = await supabase
       .from('profiles')
-      .select('role')
+      .select('role, status')
       .eq('id', user.id)
       .single()
+
+    if (!profile) {
+      await supabase.auth.signOut()
+      return redirectToLogin('not_registered')
+    }
+
+    if (profile.status === 'pending') {
+      await supabase.auth.signOut()
+      return redirectToLogin('pending_approval')
+    }
+
+    if (profile.status === 'rejected' || profile.status === 'inactive') {
+      await supabase.auth.signOut()
+      return redirectToLogin('access_rejected')
+    }
+
+    if (profile.status !== 'active') {
+      await supabase.auth.signOut()
+      return redirectToLogin('pending_approval')
+    }
+
+    if (onProtectedAppRoute) {
+      return supabaseResponse
+    }
 
     // TODO: redirect admins to /admin/dashboard once that page is built
     const dest = '/member/dashboard'
@@ -78,11 +115,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: [
-    '/member/:path*',
-    '/admin/:path*',
-    '/login',
-    '/auth/:path*',
-    '/api/trpc/:path*',
-  ],
+  matcher: ['/member/:path*', '/admin/:path*', '/login', '/auth/:path*', '/api/trpc/:path*'],
 }

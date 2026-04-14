@@ -49,10 +49,33 @@ export const publicProcedure = t.procedure.use(timingMiddleware);
 
 export const protectedProcedure = t.procedure
   .use(timingMiddleware)
-  .use(({ ctx, next }) => {
+  .use(async ({ ctx, next }) => {
     if (!ctx.user) {
       throw new TRPCError({ code: "UNAUTHORIZED" });
     }
+
+    const { data: profile, error } = await ctx.supabase
+      .from("profiles")
+      .select("status")
+      .eq("id", ctx.user.id)
+      .single();
+
+    if (error || !profile) {
+      throw new TRPCError({ code: "UNAUTHORIZED", message: "PROFILE_NOT_FOUND" });
+    }
+
+    if (profile.status === "pending") {
+      throw new TRPCError({ code: "FORBIDDEN", message: "ACCOUNT_PENDING_APPROVAL" });
+    }
+
+    if (profile.status === "rejected" || profile.status === "inactive") {
+      throw new TRPCError({ code: "FORBIDDEN", message: "ACCOUNT_REJECTED" });
+    }
+
+    if (profile.status !== "active") {
+      throw new TRPCError({ code: "FORBIDDEN", message: "ACCOUNT_NOT_ACTIVE" });
+    }
+
     return next({
       ctx: {
         ...ctx,

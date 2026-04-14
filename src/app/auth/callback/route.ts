@@ -18,7 +18,7 @@ export async function GET(request: Request) {
     if (user) {
       const { data: profile } = await supabase
         .from('profiles')
-        .select('role')
+        .select('role, status')
         .eq('id', user.id)
         .single()
 
@@ -26,6 +26,21 @@ export async function GET(request: Request) {
       if (!profile) {
         await supabase.auth.signOut()
         return NextResponse.redirect(`${origin}/login?error=not_registered`)
+      }
+
+      if (profile.status === 'pending') {
+        await supabase.auth.signOut()
+        return NextResponse.redirect(`${origin}/login?error=pending_approval`)
+      }
+
+      if (profile.status === 'rejected' || profile.status === 'inactive') {
+        await supabase.auth.signOut()
+        return NextResponse.redirect(`${origin}/login?error=access_rejected`)
+      }
+
+      if (profile.status !== 'active') {
+        await supabase.auth.signOut()
+        return NextResponse.redirect(`${origin}/login?error=pending_approval`)
       }
 
       // TODO: redirect admins to /admin/dashboard once that page is built
