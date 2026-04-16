@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { createTRPCRouter, protectedProcedure, adminProcedure } from "~/server/api/trpc";
 
 const PILLAR_STATUSES = ["new", "in_progress", "in_review", "done"] as const;
 type PillarStatus = (typeof PILLAR_STATUSES)[number];
@@ -258,5 +258,242 @@ export const kanbanRouter = createTRPCRouter({
 
       if (error) throw new Error(error.message);
       return data;
+    }),
+
+  // ── ADMIN: Bird's Eye View ────────────────────────────────────────────────
+  getAdminBirdsEye: adminProcedure.query(async ({ ctx }) => {
+    const { data: events, error: evtErr } = await ctx.supabase
+      .from("events")
+      .select("id, name, date, status, description")
+      .order("date", { ascending: false }) as unknown as {
+        data: Array<{ id: string; name: string; date: string | null; status: string; description: string | null }> | null;
+        error: { message: string } | null;
+      };
+
+    if (evtErr) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: evtErr.message });
+    if (!events?.length) return [];
+
+    const eventIds = events.map((e) => e.id);
+
+    const { data: members, error: memErr } = await ctx.supabase
+      .from("event_members")
+      .select("event_id, pillar_status, user_id")
+      .in("event_id", eventIds) as unknown as {
+        data: Array<{ event_id: string; pillar_status: string; user_id: string }> | null;
+        error: { message: string } | null;
+      };
+
+    if (memErr) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: memErr.message });
+
+    const allUserIds = [...new Set((members ?? []).map((m) => m.user_id))];
+    const { data: profiles } = await ctx.supabase
+      .from("profiles")
+      .select("id, avatar_url, name")
+      .in("id", allUserIds) as unknown as {
+        data: Array<{ id: string; avatar_url: string | null; name: string }> | null;
+        error: unknown;
+      };
+
+    const profileMap = new Map((profiles ?? []).map((p) => [p.id, p]));
+
+    const statusToKanban = (s: string): "new" | "in_progress" | "in_review" | "done" => {
+      if (s === "draft") return "new";
+      if (s === "archived") return "done";
+      return "in_progress";
+    };
+
+    const today = new Date();
+
+    return events.map((ev) => {
+      const evMembers = (members ?? []).filter((m) => m.event_id === ev.id);
+      const counts = { new: 0, in_progress: 0, in_review: 0, done: 0 };
+      for (const m of evMembers) {
+        const s = (m.pillar_status ?? "new") as keyof typeof counts;
+        if (s in counts) counts[s]++;
+      }
+      const totalMembers = evMembers.length;
+      const allInReview = totalMembers > 0 && counts.in_review === totalMembers;
+
+      const seenUsers = new Set<string>();
+      const avatarUrls: string[] = [];
+      for (const m of evMembers) {
+        if (seenUsers.has(m.user_id)) continue;
+        seenUsers.add(m.user_id);
+        const p = profileMap.get(m.user_id);
+        if (p?.avatar_url) avatarUrls.push(p.avatar_url);
+        if (avatarUrls.length >= 4) break;
+      }
+
+      const eventDate = ev.date ? new Date(ev.date) : null;
+      const daysLeft = eventDate
+        ? Math.ceil((eventDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+        : null;
+      const deadlineTag: "URGENT" | "IN VIEW" | "NEW" =
+        daysLeft === null ? "NEW"
+          : daysLeft <= 7 ? "URGENT"
+          : daysLeft <= 30 ? "IN VIEW"
+          : "NEW";
+
+      return {
+        id: ev.id,
+        name: ev.name,
+        date: ev.date,
+        status: ev.status,
+        kanbanStatus: statusToKanban(ev.status),
+        description: ev.description,
+        globalProgress: counts,
+        totalMembers,
+        avatarUrls,
+        allInReview,
+        deadlineTag,
+        daysLeft,
+      };
+    });
+  }),
+
+  // ── ADMIN: Move event kanban column ───────────────────────────────────────
+  moveEvent: adminProcedure
+    .input(z.object({ eventId: z.string().uuid(), kanbanStatus: z.enum(["new", "in_progress", "in_review", "done"]) }))
+    .mutation(async ({ ctx, input }) => {
+      const kanbanToStatus: Record<string, string> = {
+        new: "draft",
+        in_progress: "active",
+        in_review: "active",
+        done: "archived",
+      };
+      const { data, error } = await ctx.supabase
+        .from("events")
+        .update({ status: kanbanToStatus[input.kanbanStatus] ?? "draft" })
+        .eq("id", input.eventId)
+        .select()
+        .single();
+      if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+      return data;
+    }),
+
+  // ── ADMIN: Open Board ─────────────────────────────────────────────────────
+  getOpenBoard: adminProcedure
+    .input(z.object({ eventId: z.string().uuid() }))
+    .query(async ({ ctx, input }) => {
+      const { data: event, error: evtErr } = await ctx.supabase
+        .from("events")
+        .select("id, name, date, status, description")
+        .eq("id", input.eventId)
+        .single() as unknown as {
+          data: { id: string; name: string; date: string | null; status: string; description: string | null } | null;
+          error: { message: string } | null;
+        };
+
+      if (evtErr ?? !event) throw new TRPCError({ code: "NOT_FOUND", message: "Event not found" });
+
+      const { data: members, error: memErr } = await ctx.supabase
+        .from("event_members")
+        .select("id, task, department, pillar_status, user_id")
+        .eq("event_id", input.eventId) as unknown as {
+          data: Array<{ id: string; task: string | null; department: string | null; pillar_status: string; user_id: string }> | null;
+          error: { message: string } | null;
+        };
+
+      if (memErr) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: memErr.message });
+
+      const userIds = [...new Set((members ?? []).map((m) => m.user_id))];
+      const { data: profiles } = await ctx.supabase
+        .from("profiles")
+        .select("id, name, avatar_url, department")
+        .in("id", userIds) as unknown as {
+          data: Array<{ id: string; name: string; avatar_url: string | null; department: string | null }> | null;
+          error: unknown;
+        };
+
+      const profileMap = new Map((profiles ?? []).map((p) => [p.id, p]));
+
+      const tasks = (members ?? []).map((m) => {
+        const profile = profileMap.get(m.user_id);
+        return {
+          id: m.id,
+          name: m.task ?? "",
+          department: m.department ?? profile?.department ?? "",
+          pillarStatus: (m.pillar_status ?? "new") as PillarStatus,
+          assigneeId: m.user_id,
+          assigneeName: profile?.name ?? "Unknown",
+          assigneeAvatar: profile?.avatar_url ?? null,
+        };
+      });
+
+      const deptCount = new Set(tasks.map((t) => t.department).filter(Boolean)).size;
+
+      return { event, tasks, taskCount: tasks.length, deptCount };
+    }),
+
+  // ── ADMIN: Move any task to any pillar ───────────────────────────────────
+  adminMoveTask: adminProcedure
+    .input(z.object({ eventMemberId: z.string().uuid(), newStatus: z.enum(PILLAR_STATUSES) }))
+    .mutation(async ({ ctx, input }) => {
+      const { data, error } = await ctx.supabase
+        .from("event_members")
+        .update({ pillar_status: input.newStatus })
+        .eq("id", input.eventMemberId)
+        .select()
+        .single();
+      if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+      return data;
+    }),
+
+  // ── ADMIN: Create / assign a task ────────────────────────────────────────
+  adminCreateTask: adminProcedure
+    .input(z.object({
+      eventId: z.string().uuid(),
+      userId: z.string().uuid(),
+      task: z.string().min(1).max(200),
+      department: z.string().min(1).max(100),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const { data: existing } = await ctx.supabase
+        .from("event_members")
+        .select("id")
+        .eq("event_id", input.eventId)
+        .eq("user_id", input.userId)
+        .maybeSingle();
+
+      if (existing) {
+        const { data, error } = await ctx.supabase
+          .from("event_members")
+          .update({ task: input.task, department: input.department })
+          .eq("id", existing.id)
+          .select()
+          .single();
+        if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+        return data;
+      }
+
+      const { data, error } = await ctx.supabase
+        .from("event_members")
+        .insert({ event_id: input.eventId, user_id: input.userId, task: input.task, department: input.department, pillar_status: "new" })
+        .select()
+        .single();
+      if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+      return data;
+    }),
+
+  // ── ADMIN: Member search for task assignment ──────────────────────────────
+  getAdminMembers: adminProcedure
+    .input(z.object({ search: z.string().optional() }))
+    .query(async ({ ctx, input }) => {
+      let query = ctx.supabase
+        .from("profiles")
+        .select("id, name, avatar_url, department, email")
+        .eq("status", "active");
+
+      if (input.search?.trim()) {
+        query = query.ilike("name", `%${input.search.trim()}%`);
+      }
+
+      const { data, error } = await query.order("name").limit(20) as unknown as {
+        data: Array<{ id: string; name: string; avatar_url: string | null; department: string | null; email: string }> | null;
+        error: { message: string } | null;
+      };
+
+      if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+      return data ?? [];
     }),
 });
