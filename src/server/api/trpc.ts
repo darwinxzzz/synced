@@ -83,3 +83,36 @@ export const protectedProcedure = t.procedure
       },
     });
   });
+
+export const adminProcedure = t.procedure
+  .use(timingMiddleware)
+  .use(async ({ ctx, next }) => {
+    if (!ctx.user) {
+      throw new TRPCError({ code: "UNAUTHORIZED" });
+    }
+
+    const { data: profile, error } = await ctx.supabase
+      .from("profiles")
+      .select("status, role")
+      .eq("id", ctx.user.id)
+      .single();
+
+    if (error || !profile) {
+      throw new TRPCError({ code: "UNAUTHORIZED", message: "PROFILE_NOT_FOUND" });
+    }
+
+    if (profile.status !== "active") {
+      throw new TRPCError({ code: "FORBIDDEN", message: "ACCOUNT_NOT_ACTIVE" });
+    }
+
+    if (profile.role !== "admin") {
+      throw new TRPCError({ code: "FORBIDDEN", message: "ADMIN_REQUIRED" });
+    }
+
+    return next({
+      ctx: {
+        ...ctx,
+        user: ctx.user,
+      },
+    });
+  });
