@@ -101,11 +101,22 @@ export async function middleware(request: NextRequest) {
     }
 
     if (onProtectedAppRoute) {
+      // Block members from /admin/* and admins from /member/*
+      if (pathname.startsWith('/admin') && profile.role !== 'admin') {
+        const url = request.nextUrl.clone()
+        url.pathname = '/member/dashboard'
+        return NextResponse.redirect(url)
+      }
+      if (pathname.startsWith('/member') && profile.role !== 'member') {
+        const url = request.nextUrl.clone()
+        url.pathname = '/admin/dashboard'
+        return NextResponse.redirect(url)
+      }
       return supabaseResponse
     }
 
-    // TODO: redirect admins to /admin/dashboard once that page is built
-    const dest = '/member/dashboard'
+    // Post-login redirect: route by role
+    const dest = profile.role === 'admin' ? '/admin/dashboard' : '/member/dashboard'
     const url = request.nextUrl.clone()
     url.pathname = dest
     return NextResponse.redirect(url)

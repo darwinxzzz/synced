@@ -94,6 +94,7 @@ export type Database = {
           description: string | null
           event_id: string | null
           id: string
+          outcome: string | null
           priority: string
           submitted_at: string | null
           task: string
@@ -108,6 +109,7 @@ export type Database = {
           description?: string | null
           event_id?: string | null
           id?: string
+          outcome?: string | null
           priority?: string
           submitted_at?: string | null
           task: string
@@ -122,6 +124,7 @@ export type Database = {
           description?: string | null
           event_id?: string | null
           id?: string
+          outcome?: string | null
           priority?: string
           submitted_at?: string | null
           task?: string
