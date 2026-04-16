@@ -5,6 +5,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { LayoutDashboard, Kanban, Star, Bell } from "lucide-react"
 import { api } from "~/trpc/react"
+import Image from "next/image"
 import { MemberProfileDrawer } from "~/app/_components/shared/MemberProfileDrawer"
 
 const NAV_LINKS = [
@@ -129,10 +130,11 @@ export default function MemberLayout({ children }: { children: React.ReactNode }
             }
           >
             {profile?.avatar_url ? (
-              <img
+              <Image
                 src={profile.avatar_url}
                 alt={profile.name}
-                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                fill
+                style={{ objectFit: "cover" }}
               />
             ) : (
               <span

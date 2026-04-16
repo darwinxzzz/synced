@@ -4,7 +4,9 @@ import { useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { LayoutDashboard, Kanban, Star, CalendarCheck, Bell } from "lucide-react"
+import Image from "next/image"
 import { api } from "~/trpc/react"
+import { MemberProfileDrawer } from "~/app/_components/shared/MemberProfileDrawer"
 
 const NAV_LINKS = [
   { href: "/admin/dashboard",    label: "Dashboard",    icon: LayoutDashboard },
@@ -109,6 +111,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             onClick={() => setProfileOpen(true)}
             aria-label="Open profile"
             style={{
+              position:     "relative",
               width:        40,
               height:       40,
               borderRadius: "50%",
@@ -127,10 +130,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             onMouseLeave={(e) => (e.currentTarget.style.borderColor = "var(--sage-mist)")}
           >
             {profile?.avatar_url ? (
-              <img
+              <Image
                 src={profile.avatar_url}
                 alt={profile.name ?? ""}
-                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                fill
+                style={{ objectFit: "cover" }}
               />
             ) : (
               <span
@@ -187,13 +191,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         })}
       </nav>
 
-      {/* Profile drawer placeholder — wired when admin profile drawer is built */}
-      {profileOpen && (
-        <div
-          className="fixed inset-0 z-50 bg-black/30"
-          onClick={() => setProfileOpen(false)}
-        />
-      )}
+      {/* Admin Profile Drawer */}
+      <MemberProfileDrawer
+        isOpen={profileOpen}
+        onClose={() => setProfileOpen(false)}
+        profile={profile}
+      />
     </div>
   )
 }

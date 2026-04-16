@@ -288,9 +288,17 @@ export const kanbanRouter = createTRPCRouter({
     const allUserIds = [...new Set((members ?? []).map((m) => m.user_id))];
     const { data: profiles } = await ctx.supabase
       .from("profiles")
-      .select("id, avatar_url, name")
+      .select("id, avatar_url, name, email, department, role, created_at")
       .in("id", allUserIds) as unknown as {
-        data: Array<{ id: string; avatar_url: string | null; name: string }> | null;
+        data: Array<{
+          id: string;
+          avatar_url: string | null;
+          name: string;
+          email: string | null;
+          department: string | null;
+          role: string | null;
+          created_at: string | null;
+        }> | null;
         error: unknown;
       };
 
@@ -315,13 +323,30 @@ export const kanbanRouter = createTRPCRouter({
       const allInReview = totalMembers > 0 && counts.in_review === totalMembers;
 
       const seenUsers = new Set<string>();
-      const avatarUrls: string[] = [];
+      const memberProfiles: Array<{
+        id: string;
+        name: string;
+        avatar_url: string | null;
+        email: string;
+        department: string | null;
+        role: string;
+        joined_date: string | null;
+      }> = [];
+
       for (const m of evMembers) {
         if (seenUsers.has(m.user_id)) continue;
         seenUsers.add(m.user_id);
         const p = profileMap.get(m.user_id);
-        if (p?.avatar_url) avatarUrls.push(p.avatar_url);
-        if (avatarUrls.length >= 4) break;
+        memberProfiles.push({
+          id: m.user_id,
+          name: p?.name ?? "Unknown",
+          avatar_url: p?.avatar_url ?? null,
+          email: p?.email ?? "",
+          department: p?.department ?? null,
+          role: p?.role ?? "member",
+          joined_date: p?.created_at ?? null,
+        });
+        if (memberProfiles.length >= 4) break;
       }
 
       const eventDate = ev.date ? new Date(ev.date) : null;
@@ -343,7 +368,7 @@ export const kanbanRouter = createTRPCRouter({
         description: ev.description,
         globalProgress: counts,
         totalMembers,
-        avatarUrls,
+        memberProfiles,
         allInReview,
         deadlineTag,
         daysLeft,

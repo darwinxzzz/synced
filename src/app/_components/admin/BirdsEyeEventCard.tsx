@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { MoreHorizontal } from "lucide-react";
+import type { MemberProfile } from "~/app/_components/shared/MemberProfileDrawer";
 
 export interface BirdsEyeEvent {
   id: string;
@@ -10,7 +12,7 @@ export interface BirdsEyeEvent {
   kanbanStatus: "new" | "in_progress" | "in_review" | "done";
   globalProgress: { new: number; in_progress: number; in_review: number; done: number };
   totalMembers: number;
-  avatarUrls: string[];
+  memberProfiles: MemberProfile[];
   allInReview: boolean;
   deadlineTag: "URGENT" | "IN VIEW" | "NEW";
   daysLeft: number | null;
@@ -18,16 +20,16 @@ export interface BirdsEyeEvent {
 
 interface BirdsEyeEventCardProps {
   event: BirdsEyeEvent;
-  onManageMembers?: (eventId: string) => void;
+  onAvatarClick?: (profile: MemberProfile) => void;
 }
 
 const DEADLINE_STYLE: Record<string, { bg: string; color: string }> = {
-  URGENT:  { bg: "rgba(220,53,69,0.10)",  color: "var(--deadline-red)" },
-  "IN VIEW": { bg: "rgba(255,193,7,0.12)", color: "var(--deadline-amber)" },
-  NEW:     { bg: "rgba(61,139,94,0.10)",  color: "var(--deadline-green)" },
+  URGENT:    { bg: "rgba(220,53,69,0.10)",  color: "var(--deadline-red)" },
+  "IN VIEW": { bg: "rgba(255,193,7,0.12)",  color: "var(--deadline-amber)" },
+  NEW:       { bg: "rgba(61,139,94,0.10)",  color: "var(--deadline-green)" },
 };
 
-export function BirdsEyeEventCard({ event, onManageMembers }: BirdsEyeEventCardProps) {
+export function BirdsEyeEventCard({ event, onAvatarClick }: BirdsEyeEventCardProps) {
   const total = event.totalMembers;
   const { new: nNew, in_progress: nProg, in_review: nRev, done: nDone } = event.globalProgress;
   const deadlineStyle = DEADLINE_STYLE[event.deadlineTag] ?? { bg: "rgba(61,139,94,0.10)", color: "var(--deadline-green)" };
@@ -79,14 +81,12 @@ export function BirdsEyeEventCard({ event, onManageMembers }: BirdsEyeEventCardP
         >
           {event.deadlineTag}
           {event.daysLeft !== null && event.deadlineTag !== "NEW" && (
-            <span style={{ fontWeight: 400, marginLeft: "4px" }}>
-              {event.daysLeft}d
-            </span>
+            <span style={{ fontWeight: 400, marginLeft: "4px" }}>{event.daysLeft}d</span>
           )}
         </span>
 
         <button
-          onClick={(e) => { e.stopPropagation(); }}
+          onClick={(e) => e.stopPropagation()}
           style={{
             width: "28px",
             height: "28px",
@@ -137,84 +137,91 @@ export function BirdsEyeEventCard({ event, onManageMembers }: BirdsEyeEventCardP
         )}
       </div>
 
-      {/* Row 3: 4-segment global progress bar */}
-      <div>
-        <div
-          style={{
-            height: "6px",
-            borderRadius: "99px",
-            overflow: "hidden",
-            display: "flex",
-            background: "rgba(140,140,140,0.10)",
-          }}
-        >
-          {segWidths.new > 0 && (
-            <div style={{ width: `${segWidths.new}%`, background: "var(--stone-grey)", transition: "width 0.4s" }} />
-          )}
-          {segWidths.in_progress > 0 && (
-            <div style={{ width: `${segWidths.in_progress}%`, background: "var(--deadline-amber)", transition: "width 0.4s" }} />
-          )}
-          {segWidths.in_review > 0 && (
-            <div style={{ width: `${segWidths.in_review}%`, background: "var(--bamboo-green)", transition: "width 0.4s" }} />
-          )}
-          {segWidths.done > 0 && (
-            <div style={{ width: `${segWidths.done}%`, background: "var(--deep-forest)", transition: "width 0.4s" }} />
-          )}
-        </div>
-        <div
-          style={{
-            display: "flex",
-            gap: "8px",
-            marginTop: "5px",
-          }}
-        >
-          {(
-            [
-              { label: "NEW",  count: nNew,  color: "var(--stone-grey)" },
-              { label: "PROG", count: nProg, color: "var(--deadline-amber)" },
-              { label: "REV",  count: nRev,  color: "var(--bamboo-green)" },
-              { label: "DONE", count: nDone, color: "var(--deep-forest)" },
-            ] as const
-          ).map(({ label, count, color }) => (
-            <span
-              key={label}
-              style={{
-                fontFamily: "'DM Sans', sans-serif",
-                fontSize: "9px",
-                fontWeight: 700,
-                letterSpacing: "0.06em",
-                color,
-              }}
-            >
-              {label} {count}
-            </span>
-          ))}
-        </div>
+      {/* Row 3: 4-segment global progress bar — no labels */}
+      <div
+        style={{
+          height: "6px",
+          borderRadius: "99px",
+          overflow: "hidden",
+          display: "flex",
+          background: "rgba(140,140,140,0.10)",
+        }}
+      >
+        {segWidths.new > 0 && (
+          <div style={{ width: `${segWidths.new}%`, background: "var(--stone-grey)", transition: "width 0.4s" }} />
+        )}
+        {segWidths.in_progress > 0 && (
+          <div style={{ width: `${segWidths.in_progress}%`, background: "var(--deadline-amber)", transition: "width 0.4s" }} />
+        )}
+        {segWidths.in_review > 0 && (
+          <div style={{ width: `${segWidths.in_review}%`, background: "var(--bamboo-green)", transition: "width 0.4s" }} />
+        )}
+        {segWidths.done > 0 && (
+          <div style={{ width: `${segWidths.done}%`, background: "var(--deep-forest)", transition: "width 0.4s" }} />
+        )}
       </div>
 
-      {/* Row 4: avatar stack + member count */}
+      {/* Row 4: clickable avatar stack + member count */}
       <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-        {event.avatarUrls.length > 0 && (
+        {event.memberProfiles.length > 0 && (
           <div style={{ display: "flex" }}>
-            {event.avatarUrls.slice(0, 4).map((url, i) => (
-              <img
-                key={i}
-                src={url}
-                alt=""
+            {event.memberProfiles.slice(0, 4).map((member, i) => (
+              <button
+                key={member.id}
+                onClick={() => onAvatarClick?.(member)}
+                aria-label={`View profile: ${member.name}`}
+                title={member.name}
                 style={{
-                  width: "24px",
-                  height: "24px",
+                  position: "relative",
+                  width: "28px",
+                  height: "28px",
                   borderRadius: "50%",
                   border: "2px solid var(--cream-white)",
-                  objectFit: "cover",
-                  marginLeft: i === 0 ? 0 : "-8px",
+                  overflow: "hidden",
+                  marginLeft: i === 0 ? 0 : "-10px",
                   zIndex: 4 - i,
-                  position: "relative",
+                  flexShrink: 0,
+                  background: "var(--sage-mist)",
+                  cursor: onAvatarClick ? "pointer" : "default",
+                  padding: 0,
+                  transition: "transform 0.15s, z-index 0s",
                 }}
-              />
+                onMouseEnter={(e) => {
+                  if (onAvatarClick) {
+                    (e.currentTarget as HTMLButtonElement).style.transform = "scale(1.15)";
+                    (e.currentTarget as HTMLButtonElement).style.zIndex = "10";
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.transform = "scale(1)";
+                  (e.currentTarget as HTMLButtonElement).style.zIndex = String(4 - i);
+                }}
+              >
+                {member.avatar_url ? (
+                  <Image src={member.avatar_url} alt={member.name} fill style={{ objectFit: "cover" }} />
+                ) : (
+                  <span
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      width: "100%",
+                      height: "100%",
+                      background: "var(--bamboo-green)",
+                      color: "#fff",
+                      fontFamily: "'DM Sans', sans-serif",
+                      fontSize: "8px",
+                      fontWeight: 700,
+                    }}
+                  >
+                    {member.name.split(" ").slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "").join("")}
+                  </span>
+                )}
+              </button>
             ))}
           </div>
         )}
+
         {event.totalMembers > 0 && (
           <span
             style={{
@@ -226,6 +233,7 @@ export function BirdsEyeEventCard({ event, onManageMembers }: BirdsEyeEventCardP
             {event.totalMembers} member{event.totalMembers !== 1 ? "s" : ""}
           </span>
         )}
+
         {event.allInReview && (
           <span
             style={{
@@ -243,53 +251,30 @@ export function BirdsEyeEventCard({ event, onManageMembers }: BirdsEyeEventCardP
         )}
       </div>
 
-      {/* Row 5: action buttons */}
-      <div style={{ display: "flex", gap: "8px" }}>
-        <Link
-          href={`/admin/kanban/${event.id}`}
-          style={{
-            flex: 1,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: "9px 12px",
-            borderRadius: "10px",
-            border: "none",
-            background: "var(--deep-forest)",
-            color: "#fff",
-            fontFamily: "'DM Sans', sans-serif",
-            fontSize: "12px",
-            fontWeight: 700,
-            letterSpacing: "0.05em",
-            textDecoration: "none",
-            transition: "background 0.2s",
-          }}
-          onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bamboo-green)")}
-          onMouseLeave={(e) => (e.currentTarget.style.background = "var(--deep-forest)")}
-        >
-          OPEN BOARD →
-        </Link>
-        <button
-          onClick={() => onManageMembers?.(event.id)}
-          style={{
-            flex: 1,
-            padding: "9px 12px",
-            borderRadius: "10px",
-            border: "1px solid rgba(28,58,43,0.20)",
-            background: "transparent",
-            color: "var(--deep-forest)",
-            fontFamily: "'DM Sans', sans-serif",
-            fontSize: "12px",
-            fontWeight: 600,
-            cursor: "pointer",
-            transition: "background 0.2s",
-          }}
-          onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(28,58,43,0.06)")}
-          onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-        >
-          Manage Members
-        </button>
-      </div>
+      {/* Row 5: OPEN BOARD only */}
+      <Link
+        href={`/admin/kanban/${event.id}`}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "9px 12px",
+          borderRadius: "10px",
+          border: "none",
+          background: "var(--deep-forest)",
+          color: "#fff",
+          fontFamily: "'DM Sans', sans-serif",
+          fontSize: "12px",
+          fontWeight: 700,
+          letterSpacing: "0.05em",
+          textDecoration: "none",
+          transition: "background 0.2s",
+        }}
+        onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bamboo-green)")}
+        onMouseLeave={(e) => (e.currentTarget.style.background = "var(--deep-forest)")}
+      >
+        OPEN BOARD →
+      </Link>
     </div>
   );
 }

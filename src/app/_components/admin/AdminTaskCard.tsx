@@ -1,5 +1,7 @@
 "use client";
 
+import Image from "next/image";
+
 export interface AdminTask {
   id: string;
   name: string;
@@ -109,18 +111,19 @@ export function AdminTaskCard({ task, onClick, dragging }: AdminTaskCardProps) {
       {/* Assignee row */}
       <div style={{ display: "flex", alignItems: "center", gap: "7px" }}>
         {task.assigneeAvatar ? (
-          <img
-            src={task.assigneeAvatar}
-            alt=""
+          <div
             style={{
+              position: "relative",
               width: "24px",
               height: "24px",
               borderRadius: "50%",
-              objectFit: "cover",
+              overflow: "hidden",
               flexShrink: 0,
               border: "1.5px solid var(--sage-mist)",
             }}
-          />
+          >
+            <Image src={task.assigneeAvatar} alt="" fill style={{ objectFit: "cover" }} />
+          </div>
         ) : (
           <div
             style={{

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Image from "next/image";
 import { X, Search } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "~/trpc/react";
@@ -254,7 +255,9 @@ export function NewTaskModal({ open, eventId, onClose, onSuccess }: NewTaskModal
                           onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
                         >
                           {m.avatar_url ? (
-                            <img src={m.avatar_url} alt="" style={{ width: "24px", height: "24px", borderRadius: "50%", objectFit: "cover" }} />
+                            <div style={{ position: "relative", width: "24px", height: "24px", borderRadius: "50%", overflow: "hidden", flexShrink: 0 }}>
+                              <Image src={m.avatar_url} alt="" fill style={{ objectFit: "cover" }} />
+                            </div>
                           ) : (
                             <div style={{ width: "24px", height: "24px", borderRadius: "50%", background: "var(--sage-mist)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'DM Sans'", fontSize: "9px", fontWeight: 700, color: "var(--deep-forest)", flexShrink: 0 }}>
                               {m.name.slice(0, 2).toUpperCase()}

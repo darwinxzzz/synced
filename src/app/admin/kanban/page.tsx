@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
-import Link from "next/link";
-import { Plus, Users } from "lucide-react";
+import { useState, useRef, useCallback, useMemo } from "react";
+import { Plus } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "~/trpc/react";
 import { BirdsEyeEventCard, type BirdsEyeEvent } from "~/app/_components/admin/BirdsEyeEventCard";
+import { FilterPanel, type KanbanFilters } from "~/app/_components/kanban/FilterPanel";
+import { MemberProfileDrawer, type MemberProfile } from "~/app/_components/shared/MemberProfileDrawer";
 
 type KanbanStatus = "new" | "in_progress" | "in_review" | "done";
 
@@ -21,16 +22,33 @@ const PILLAR_CONFIG: Record<KanbanStatus, { label: string; dotColor: string }> =
 export default function AdminKanbanPage() {
   const [mobilePillar, setMobilePillar] = useState<KanbanStatus>("new");
   const [dragOverPillar, setDragOverPillar] = useState<KanbanStatus | null>(null);
+  const [filters, setFilters] = useState<KanbanFilters>({ dateSort: null, priorityFilter: null, nameSort: null });
+  const [selectedProfile, setSelectedProfile] = useState<MemberProfile | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const { data: events = [], refetch } = api.kanban.getAdminBirdsEye.useQuery();
+  const { data: rawEvents = [], refetch } = api.kanban.getAdminBirdsEye.useQuery();
 
   const moveEvent = api.kanban.moveEvent.useMutation({
     onSuccess: () => void refetch(),
     onError: (err) => toast.error(err.message),
   });
 
-  const activeCount = events.filter((e) => e.status === "active").length;
+  const activeCount = rawEvents.filter((e) => e.status === "active").length;
+
+  // Apply name/date sort
+  const events = useMemo<BirdsEyeEvent[]>(() => {
+    const sorted = [...rawEvents] as BirdsEyeEvent[];
+    if (filters.nameSort === "asc") {
+      sorted.sort((a, b) => a.name.localeCompare(b.name));
+    } else if (filters.nameSort === "desc") {
+      sorted.sort((a, b) => b.name.localeCompare(a.name));
+    } else if (filters.dateSort === "asc") {
+      sorted.sort((a, b) => (a.date ?? "").localeCompare(b.date ?? ""));
+    } else if (filters.dateSort === "desc") {
+      sorted.sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
+    }
+    return sorted;
+  }, [rawEvents, filters.nameSort, filters.dateSort]);
 
   const eventsByPillar: Record<KanbanStatus, BirdsEyeEvent[]> = {
     new: [], in_progress: [], in_review: [], done: [],
@@ -65,7 +83,6 @@ export default function AdminKanbanPage() {
 
         {/* Header */}
         <div style={{ paddingTop: "32px", paddingBottom: "24px" }}>
-          {/* EXCO label */}
           <p
             style={{
               fontFamily: "'DM Sans', sans-serif",
@@ -101,33 +118,17 @@ export default function AdminKanbanPage() {
               Kanban Board
             </h1>
 
-            <div style={{ display: "flex", gap: "10px", flexShrink: 0 }}>
-              <Link
-                href="/admin/members"
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "6px",
-                  padding: "9px 16px",
-                  borderRadius: "10px",
-                  border: "1px solid rgba(28,58,43,0.20)",
-                  background: "transparent",
-                  color: "var(--deep-forest)",
-                  fontFamily: "'DM Sans', sans-serif",
-                  fontSize: "13px",
-                  fontWeight: 600,
-                  textDecoration: "none",
-                  transition: "background 0.2s",
-                }}
-                onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(28,58,43,0.06)")}
-                onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-              >
-                <Users size={14} />
-                Manage Members
-              </Link>
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", flexShrink: 0 }}>
+              <FilterPanel
+                filters={filters}
+                onChange={setFilters}
+                showName
+                showDate
+                showPriority={false}
+              />
 
-              <Link
-                href="/admin/events/new"
+              <button
+                onClick={() => toast.info("Create event coming soon")}
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -140,7 +141,7 @@ export default function AdminKanbanPage() {
                   fontFamily: "'DM Sans', sans-serif",
                   fontSize: "13px",
                   fontWeight: 600,
-                  textDecoration: "none",
+                  cursor: "pointer",
                   transition: "background 0.2s",
                 }}
                 onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bamboo-green)")}
@@ -148,7 +149,7 @@ export default function AdminKanbanPage() {
               >
                 <Plus size={14} />
                 Add Event
-              </Link>
+              </button>
             </div>
           </div>
         </div>
@@ -341,7 +342,10 @@ export default function AdminKanbanPage() {
                           e.dataTransfer.effectAllowed = "move";
                         }}
                       >
-                        <BirdsEyeEventCard event={ev} />
+                        <BirdsEyeEventCard
+                          event={ev}
+                          onAvatarClick={setSelectedProfile}
+                        />
                       </div>
                     ))
                   )}
@@ -351,6 +355,13 @@ export default function AdminKanbanPage() {
           })}
         </div>
       </div>
+
+      {/* Member profile drawer — opens on avatar click */}
+      <MemberProfileDrawer
+        isOpen={!!selectedProfile}
+        onClose={() => setSelectedProfile(null)}
+        profile={selectedProfile}
+      />
     </div>
   );
 }

@@ -60,7 +60,7 @@ export default function AdminOpenBoardPage() {
     return () => { void supabase.removeChannel(channel); };
   }, [eventId, refetch]);
 
-  const allTasks: AdminTask[] = data?.tasks ?? [];
+  const allTasks = useMemo<AdminTask[]>(() => data?.tasks ?? [], [data?.tasks]);
 
   // Unique departments for filter
   const departments = useMemo(
