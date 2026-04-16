@@ -133,22 +133,23 @@ export default function AdminKanbanPage() {
                   display: "flex",
                   alignItems: "center",
                   gap: "6px",
-                  padding: "9px 16px",
+                  padding: "9px 18px",
                   borderRadius: "10px",
                   border: "none",
-                  background: "var(--deep-forest)",
-                  color: "#fff",
+                  background: "linear-gradient(135deg, var(--deep-forest) 0%, var(--bamboo-green) 100%)",
+                  color: "var(--ivory-paper)",
                   fontFamily: "'DM Sans', sans-serif",
                   fontSize: "13px",
                   fontWeight: 600,
                   cursor: "pointer",
-                  transition: "background 0.2s",
+                  transition: "opacity 0.2s",
+                  boxShadow: "0 4px 12px rgba(28,58,43,0.15)",
                 }}
-                onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bamboo-green)")}
-                onMouseLeave={(e) => (e.currentTarget.style.background = "var(--deep-forest)")}
+                onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.88")}
+                onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
               >
                 <Plus size={14} />
-                Add Event
+                + Add Event
               </button>
             </div>
           </div>
@@ -274,15 +275,12 @@ export default function AdminKanbanPage() {
                   </span>
                   <span
                     style={{
-                      fontFamily: "'DM Sans', sans-serif",
-                      fontSize: "11px",
-                      fontWeight: 700,
-                      color: "var(--cream-white)",
-                      background: "var(--stone-grey)",
-                      borderRadius: "99px",
-                      padding: "1px 7px",
-                      minWidth: "20px",
-                      textAlign: "center",
+                      fontFamily: "'Playfair Display', serif",
+                      fontSize: "12px",
+                      fontStyle: "italic",
+                      fontWeight: 400,
+                      color: "var(--stone-grey)",
+                      opacity: 0.7,
                     }}
                   >
                     {String(colEvents.length).padStart(2, "0")}

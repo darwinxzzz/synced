@@ -52,20 +52,20 @@ export function BirdsEyeEventCard({ event, onAvatarClick }: BirdsEyeEventCardPro
       className="card-shadow"
       style={{
         background: "var(--cream-white)",
-        borderRadius: "16px",
-        padding: "18px",
+        borderRadius: "20px",
+        padding: "20px",
         display: "flex",
         flexDirection: "column",
-        gap: "14px",
-        border: "1px solid rgba(140,140,140,0.12)",
-        transition: "box-shadow 0.2s",
+        gap: "0",
+        border: "1px solid rgba(140,140,140,0.08)",
+        transition: "box-shadow 0.2s, opacity 0.2s",
         cursor: "default",
       }}
       onMouseEnter={(e) => (e.currentTarget.style.boxShadow = "0 4px 20px rgba(28,58,43,0.10)")}
       onMouseLeave={(e) => (e.currentTarget.style.boxShadow = "")}
     >
       {/* Row 1: deadline badge + menu */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
         <span
           style={{
             fontFamily: "'DM Sans', sans-serif",
@@ -109,7 +109,7 @@ export function BirdsEyeEventCard({ event, onAvatarClick }: BirdsEyeEventCardPro
       </div>
 
       {/* Row 2: event name + date */}
-      <div>
+      <div style={{ marginBottom: "16px" }}>
         <h3
           style={{
             fontFamily: "'Playfair Display', serif",
@@ -128,6 +128,7 @@ export function BirdsEyeEventCard({ event, onAvatarClick }: BirdsEyeEventCardPro
             style={{
               fontFamily: "'DM Sans', sans-serif",
               fontSize: "11px",
+              fontStyle: "italic",
               color: "var(--stone-grey)",
               margin: "4px 0 0",
             }}
@@ -137,35 +138,95 @@ export function BirdsEyeEventCard({ event, onAvatarClick }: BirdsEyeEventCardPro
         )}
       </div>
 
-      {/* Row 3: 4-segment global progress bar — no labels */}
+      {/* Row 3: GLOBAL PROGRESS label + mini status labels */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: "8px" }}>
+        <span
+          style={{
+            fontFamily: "'DM Sans', sans-serif",
+            fontSize: "9px",
+            fontWeight: 700,
+            letterSpacing: "0.14em",
+            textTransform: "uppercase",
+            color: "var(--bamboo-green)",
+          }}
+        >
+          Global Progress
+        </span>
+        <div style={{ display: "flex", gap: "6px" }}>
+          {(["NEW", "PROG", "REV", "DONE"] as const).map((lbl) => (
+            <span
+              key={lbl}
+              style={{
+                fontFamily: "'DM Sans', sans-serif",
+                fontSize: "7px",
+                fontWeight: 700,
+                letterSpacing: "0.08em",
+                color: lbl === "PROG" ? "var(--deep-forest)" : lbl === "DONE" ? "var(--bamboo-green)" : "rgba(140,140,140,0.55)",
+              }}
+            >
+              {lbl}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {/* Row 4: 4-segment global progress bar */}
       <div
         style={{
-          height: "6px",
+          height: "8px",
           borderRadius: "99px",
           overflow: "hidden",
           display: "flex",
           background: "rgba(140,140,140,0.10)",
+          marginBottom: "16px",
         }}
       >
         {segWidths.new > 0 && (
-          <div style={{ width: `${segWidths.new}%`, background: "var(--stone-grey)", transition: "width 0.4s" }} />
+          <div style={{ width: `${segWidths.new}%`, background: "var(--deep-forest)", transition: "width 0.4s" }} />
         )}
         {segWidths.in_progress > 0 && (
-          <div style={{ width: `${segWidths.in_progress}%`, background: "var(--deadline-amber)", transition: "width 0.4s" }} />
+          <div style={{ width: `${segWidths.in_progress}%`, background: "var(--bamboo-green)", transition: "width 0.4s" }} />
         )}
         {segWidths.in_review > 0 && (
-          <div style={{ width: `${segWidths.in_review}%`, background: "var(--bamboo-green)", transition: "width 0.4s" }} />
+          <div style={{ width: `${segWidths.in_review}%`, background: "var(--sage-mist)", transition: "width 0.4s" }} />
         )}
         {segWidths.done > 0 && (
-          <div style={{ width: `${segWidths.done}%`, background: "var(--deep-forest)", transition: "width 0.4s" }} />
+          <div style={{ width: `${segWidths.done}%`, background: "var(--stone-grey)", opacity: 0.5, transition: "width 0.4s" }} />
         )}
       </div>
 
-      {/* Row 4: clickable avatar stack + member count */}
-      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+      {/* Row 5: OPEN BOARD (left) + avatar stack (right) — separated by border-top */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          paddingTop: "14px",
+          borderTop: "1px solid rgba(140,140,140,0.10)",
+        }}
+      >
+        <Link
+          href={`/admin/kanban/${event.id}`}
+          style={{
+            fontFamily: "'DM Sans', sans-serif",
+            fontSize: "10px",
+            fontWeight: 700,
+            letterSpacing: "0.10em",
+            textTransform: "uppercase",
+            color: "var(--deep-forest)",
+            textDecoration: "none",
+            transition: "color 0.2s",
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.color = "var(--bamboo-green)")}
+          onMouseLeave={(e) => (e.currentTarget.style.color = "var(--deep-forest)")}
+        >
+          Open Board →
+        </Link>
+
+        {/* Avatar stack with overflow indicator */}
         {event.memberProfiles.length > 0 && (
-          <div style={{ display: "flex" }}>
-            {event.memberProfiles.slice(0, 4).map((member, i) => (
+          <div style={{ display: "flex", alignItems: "center" }}>
+            {event.memberProfiles.slice(0, 3).map((member, i) => (
               <button
                 key={member.id}
                 onClick={() => onAvatarClick?.(member)}
@@ -178,13 +239,13 @@ export function BirdsEyeEventCard({ event, onAvatarClick }: BirdsEyeEventCardPro
                   borderRadius: "50%",
                   border: "2px solid var(--cream-white)",
                   overflow: "hidden",
-                  marginLeft: i === 0 ? 0 : "-10px",
+                  marginLeft: i === 0 ? 0 : "-8px",
                   zIndex: 4 - i,
                   flexShrink: 0,
                   background: "var(--sage-mist)",
                   cursor: onAvatarClick ? "pointer" : "default",
                   padding: 0,
-                  transition: "transform 0.15s, z-index 0s",
+                  transition: "transform 0.15s",
                 }}
                 onMouseEnter={(e) => {
                   if (onAvatarClick) {
@@ -219,62 +280,32 @@ export function BirdsEyeEventCard({ event, onAvatarClick }: BirdsEyeEventCardPro
                 )}
               </button>
             ))}
+            {event.totalMembers > 3 && (
+              <div
+                style={{
+                  width: "28px",
+                  height: "28px",
+                  borderRadius: "50%",
+                  border: "2px solid var(--cream-white)",
+                  background: "var(--ivory-paper)",
+                  marginLeft: "-8px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontFamily: "'DM Sans', sans-serif",
+                  fontSize: "8px",
+                  fontWeight: 700,
+                  color: "var(--deep-forest)",
+                  zIndex: 0,
+                  flexShrink: 0,
+                }}
+              >
+                +{event.totalMembers - 3}
+              </div>
+            )}
           </div>
         )}
-
-        {event.totalMembers > 0 && (
-          <span
-            style={{
-              fontFamily: "'DM Sans', sans-serif",
-              fontSize: "11px",
-              color: "var(--stone-grey)",
-            }}
-          >
-            {event.totalMembers} member{event.totalMembers !== 1 ? "s" : ""}
-          </span>
-        )}
-
-        {event.allInReview && (
-          <span
-            style={{
-              fontFamily: "'DM Sans', sans-serif",
-              fontSize: "10px",
-              fontWeight: 700,
-              color: "var(--bamboo-green)",
-              background: "rgba(74,124,89,0.10)",
-              padding: "2px 7px",
-              borderRadius: "6px",
-            }}
-          >
-            All in Review
-          </span>
-        )}
       </div>
-
-      {/* Row 5: OPEN BOARD only */}
-      <Link
-        href={`/admin/kanban/${event.id}`}
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          padding: "9px 12px",
-          borderRadius: "10px",
-          border: "none",
-          background: "var(--deep-forest)",
-          color: "#fff",
-          fontFamily: "'DM Sans', sans-serif",
-          fontSize: "12px",
-          fontWeight: 700,
-          letterSpacing: "0.05em",
-          textDecoration: "none",
-          transition: "background 0.2s",
-        }}
-        onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bamboo-green)")}
-        onMouseLeave={(e) => (e.currentTarget.style.background = "var(--deep-forest)")}
-      >
-        OPEN BOARD →
-      </Link>
     </div>
   );
 }

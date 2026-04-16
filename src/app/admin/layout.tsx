@@ -3,7 +3,7 @@
 import { useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { LayoutDashboard, Kanban, Star, CalendarCheck, Bell } from "lucide-react"
+import { LayoutDashboard, Kanban, Star, CalendarCheck, Bell, Settings } from "lucide-react"
 import Image from "next/image"
 import { api } from "~/trpc/react"
 import { MemberProfileDrawer } from "~/app/_components/shared/MemberProfileDrawer"
@@ -98,13 +98,34 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               display:    "flex",
               alignItems: "center",
               justifyContent: "center",
-              color:      "var(--stone-grey)",
+              color:      "var(--bamboo-green)",
               transition: "background 0.2s",
             }}
             onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(168,197,160,0.20)")}
             onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
           >
             <Bell size={20} />
+          </button>
+
+          <button
+            aria-label="Settings"
+            style={{
+              width:      40,
+              height:     40,
+              borderRadius: "50%",
+              border:     "none",
+              background: "transparent",
+              cursor:     "pointer",
+              display:    "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color:      "var(--bamboo-green)",
+              transition: "background 0.2s",
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(168,197,160,0.20)")}
+            onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+          >
+            <Settings size={20} />
           </button>
 
           <button
