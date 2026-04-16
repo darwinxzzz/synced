@@ -5,6 +5,7 @@ import { Plus } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "~/trpc/react";
 import { BirdsEyeEventCard, type BirdsEyeEvent } from "~/app/_components/admin/BirdsEyeEventCard";
+import { CreateEventModal } from "~/app/_components/admin/CreateEventModal";
 import { FilterPanel, type KanbanFilters } from "~/app/_components/kanban/FilterPanel";
 import { MemberProfileDrawer, type MemberProfile } from "~/app/_components/shared/MemberProfileDrawer";
 
@@ -24,6 +25,7 @@ export default function AdminKanbanPage() {
   const [dragOverPillar, setDragOverPillar] = useState<KanbanStatus | null>(null);
   const [filters, setFilters] = useState<KanbanFilters>({ dateSort: null, priorityFilter: null, nameSort: null });
   const [selectedProfile, setSelectedProfile] = useState<MemberProfile | null>(null);
+  const [createEventOpen, setCreateEventOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const { data: rawEvents = [], refetch } = api.kanban.getAdminBirdsEye.useQuery();
@@ -128,7 +130,7 @@ export default function AdminKanbanPage() {
               />
 
               <button
-                onClick={() => toast.info("Create event coming soon")}
+                onClick={() => setCreateEventOpen(true)}
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -359,6 +361,15 @@ export default function AdminKanbanPage() {
         isOpen={!!selectedProfile}
         onClose={() => setSelectedProfile(null)}
         profile={selectedProfile}
+      />
+
+      <CreateEventModal
+        isOpen={createEventOpen}
+        onClose={() => setCreateEventOpen(false)}
+        onCreated={() => {
+          void refetch();
+          toast.success("Kanban updated");
+        }}
       />
     </div>
   );

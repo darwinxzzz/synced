@@ -161,6 +161,7 @@ export const testimonialsRouter = createTRPCRouter({
       const endorsement =
         testimonial?.finalised_at
           ? {
+              testimonialId: testimonial.id,
               quote: testimonial.endorsement_quote ?? "",
               adminName: testimonial.endorsement_name ?? "",
               adminTitle: testimonial.endorsement_title ?? "",
@@ -219,6 +220,217 @@ export const testimonialsRouter = createTRPCRouter({
     return data
   }),
 
+  getAdminTestimonialsOverview: protectedProcedure
+    .input(
+      z.object({
+        department: z.string().optional(),
+        status: z.string().optional(),
+        search: z.string().optional(),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      const { data: callerProfile } = await ctx.supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", ctx.user.id)
+        .single()
+
+      if (callerProfile?.role !== "admin") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Admin only" })
+      }
+
+      const [totalMembersRes, activeMembersRes, pendingReqRes, departmentsRes] = await Promise.all([
+        ctx.supabase.from("profiles").select("id", { count: "exact", head: true }).eq("role", "member"),
+        ctx.supabase.from("profiles").select("id", { count: "exact", head: true }).eq("role", "member").eq("status", "active"),
+        ctx.supabase.from("testimonial_requests").select("id", { count: "exact", head: true }).eq("status", "pending"),
+        ctx.supabase.from("profiles").select("department").eq("role", "member").not("department", "is", null),
+      ])
+
+      let membersQuery = ctx.supabase
+        .from("profiles")
+        .select("id, name, email, avatar_url, department, joined_date, status")
+        .eq("role", "member")
+
+      if (input.search?.trim()) {
+        membersQuery = membersQuery.ilike("name", `%${input.search.trim()}%`)
+      }
+      if (input.department?.trim()) {
+        membersQuery = membersQuery.eq("department", input.department.trim())
+      }
+
+      const { data: members, error: membersError } = await membersQuery.order("name")
+      if (membersError) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: membersError.message })
+      }
+
+      const memberIds = (members ?? []).map((m) => m.id)
+      if (memberIds.length === 0) {
+        const deptSet = new Set((departmentsRes.data ?? []).map((d) => d.department).filter(Boolean))
+        return {
+          kpi: {
+            totalMembers: totalMembersRes.count ?? 0,
+            activeMembers: activeMembersRes.count ?? 0,
+            departments: deptSet.size,
+            pendingRequests: pendingReqRes.count ?? 0,
+          },
+          departments: Array.from(deptSet).sort(),
+          statuses: ["pending", "generated", "sent"],
+          cards: [],
+        }
+      }
+
+      const { data: requests, error: requestsError } = await ctx.supabase
+        .from("testimonial_requests")
+        .select("user_id, status, requested_at")
+        .in("user_id", memberIds)
+
+      if (requestsError) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: requestsError.message })
+      }
+
+      const { data: eventMembers, error: eventMembersError } = await ctx.supabase
+        .from("event_members")
+        .select("user_id, event_id")
+        .in("user_id", memberIds)
+
+      if (eventMembersError) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: eventMembersError.message })
+      }
+
+      const { data: attendance, error: attendanceError } = await ctx.supabase
+        .from("attendance")
+        .select("user_id, status")
+        .in("user_id", memberIds)
+        .eq("type", "event")
+
+      if (attendanceError) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: attendanceError.message })
+      }
+
+      const { data: contributions, error: contributionsError } = await ctx.supabase
+        .from("contributions")
+        .select("id, user_id, description, submitted_at, created_at")
+        .in("user_id", memberIds)
+
+      if (contributionsError) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: contributionsError.message })
+      }
+
+      const contributionIds = (contributions ?? []).map((c) => c.id)
+      const reflections =
+        contributionIds.length > 0
+          ? await ctx.supabase
+              .from("reflections")
+              .select("contribution_id, description, status, submitted_at, created_at")
+              .in("contribution_id", contributionIds)
+              .eq("status", "archived")
+          : { data: [], error: null }
+
+      if (reflections.error) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: reflections.error.message })
+      }
+
+      const requestsMap = new Map((requests ?? []).map((r) => [r.user_id, r]))
+
+      const eventsByUser = new Map<string, Set<string>>()
+      for (const row of eventMembers ?? []) {
+        if (!eventsByUser.has(row.user_id)) eventsByUser.set(row.user_id, new Set())
+        eventsByUser.get(row.user_id)?.add(row.event_id)
+      }
+
+      const attendanceByUser = new Map<string, { total: number; attended: number }>()
+      for (const row of attendance ?? []) {
+        const prev = attendanceByUser.get(row.user_id) ?? { total: 0, attended: 0 }
+        prev.total += 1
+        if (row.status === "attended") prev.attended += 1
+        attendanceByUser.set(row.user_id, prev)
+      }
+
+      const contributionsByUser = new Map<
+        string,
+        Array<{ id: string; description: string | null; submitted_at: string | null; created_at: string | null }>
+      >()
+      for (const row of contributions ?? []) {
+        const list = contributionsByUser.get(row.user_id) ?? []
+        list.push(row)
+        contributionsByUser.set(row.user_id, list)
+      }
+
+      const reflectionsByContribution = new Map(
+        (reflections.data ?? []).map((r) => [r.contribution_id, r])
+      )
+
+      const cards = (members ?? [])
+        .map((member) => {
+          const memberContributions = contributionsByUser.get(member.id) ?? []
+          const eventCount = eventsByUser.get(member.id)?.size ?? 0
+          const attendanceStat = attendanceByUser.get(member.id) ?? { total: 0, attended: 0 }
+          const attendancePct =
+            attendanceStat.total > 0
+              ? Math.round((attendanceStat.attended / attendanceStat.total) * 100)
+              : 0
+
+          let quoteSnippet = "No archived reflection yet."
+          const latestReflections = memberContributions
+            .map((contribution) => reflectionsByContribution.get(contribution.id))
+            .filter((reflection): reflection is NonNullable<typeof reflection> => Boolean(reflection))
+            .sort((a, b) => {
+              const aTime = new Date(a.submitted_at ?? a.created_at ?? 0).getTime()
+              const bTime = new Date(b.submitted_at ?? b.created_at ?? 0).getTime()
+              return bTime - aTime
+            })
+
+          if (latestReflections[0]?.description) {
+            quoteSnippet = latestReflections[0].description
+          } else if (memberContributions[0]?.description) {
+            quoteSnippet = memberContributions[0].description
+          }
+
+          const req = requestsMap.get(member.id)
+          const requestStatus = req?.status ?? "pending"
+          const joinedAt = member.joined_date ? new Date(member.joined_date) : null
+          const monthDiff = joinedAt
+            ? Math.max(
+                1,
+                (new Date().getFullYear() - joinedAt.getFullYear()) * 12 +
+                  (new Date().getMonth() - joinedAt.getMonth())
+              )
+            : 1
+
+          return {
+            memberId: member.id,
+            name: member.name,
+            avatarUrl: member.avatar_url,
+            department: member.department ?? "General",
+            tenure: `${monthDiff} month${monthDiff === 1 ? "" : "s"} at SYAI`,
+            stats: {
+              events: eventCount,
+              hours: memberContributions.length * 8,
+              attendancePct,
+            },
+            quoteSnippet,
+            requestStatus,
+          }
+        })
+        .filter((card) => {
+          if (!input.status || input.status === "all") return true
+          return card.requestStatus === input.status
+        })
+
+      const deptSet = new Set((departmentsRes.data ?? []).map((d) => d.department).filter(Boolean))
+      return {
+        kpi: {
+          totalMembers: totalMembersRes.count ?? 0,
+          activeMembers: activeMembersRes.count ?? 0,
+          departments: deptSet.size,
+          pendingRequests: pendingReqRes.count ?? 0,
+        },
+        departments: Array.from(deptSet).sort(),
+        statuses: ["all", "pending", "generated", "sent"],
+        cards,
+      }
+    }),
+
   updateTestimonial: protectedProcedure
     .input(
       z.object({
@@ -259,6 +471,8 @@ export const testimonialsRouter = createTRPCRouter({
       z.object({
         memberId: z.string().uuid(),
         endorsementQuote: z.string().min(1),
+        endorsementName: z.string().optional(),
+        endorsementTitle: z.string().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -278,10 +492,16 @@ export const testimonialsRouter = createTRPCRouter({
         .eq("user_id", input.memberId)
         .maybeSingle()
 
+      const requestedName = input.endorsementName?.trim()
+      const requestedTitle = input.endorsementTitle?.trim()
+
       const testimonialPayload = {
         endorsement_quote: input.endorsementQuote,
-        endorsement_name: adminProfile.name,
-        endorsement_title: adminProfile.department ?? "Admin",
+        endorsement_name: requestedName && requestedName.length > 0 ? requestedName : adminProfile.name,
+        endorsement_title:
+          requestedTitle && requestedTitle.length > 0
+            ? requestedTitle
+            : (adminProfile.department ?? "Admin"),
         finalised_at: new Date().toISOString(),
       }
 
