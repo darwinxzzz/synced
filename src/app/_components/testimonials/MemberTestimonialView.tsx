@@ -9,6 +9,7 @@ interface MemberTestimonialViewProps {
   memberId: string;
   headerOverride?: string;
   viewerRole?: "member" | "admin";
+  onGenerate?: () => void;
 }
 
 function MetricCard({ value, label }: { value: string | number; label: string }) {
@@ -42,10 +43,23 @@ function MetricCard({ value, label }: { value: string | number; label: string })
   );
 }
 
+function getPerformanceRating(pct: number): { label: string; tier: string } {
+  if (pct >= 90) return { label: "Outstanding", tier: "Highest Tier" };
+  if (pct >= 75) return { label: "Very Good", tier: "Upper Higher Tier" };
+  if (pct >= 50) return { label: "Satisfactory", tier: "Second Lowest Tier" };
+  return { label: "Unsatisfactory", tier: "Lowest Tier" };
+}
+
+function formatMonthYear(dateStr: string | null | undefined): string {
+  if (!dateStr) return "—";
+  return new Date(dateStr).toLocaleDateString("en-GB", { month: "short", year: "numeric" });
+}
+
 export function MemberTestimonialView({
   memberId,
   headerOverride,
   viewerRole = "member",
+  onGenerate,
 }: MemberTestimonialViewProps) {
   const [openReflection, setOpenReflection] = useState<ReflectionItem | null>(null);
 
@@ -84,17 +98,14 @@ export function MemberTestimonialView({
 
   const { profile, metrics, contributionHistory, endorsement, hasRequestedTestimonial, requestStatus } = data;
 
-  const issueDate = new Date().toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
-  const refNumber = `SYAI-2026-${memberId.slice(0, 6).toUpperCase()}`;
+  const performance = getPerformanceRating(metrics.weeklyAttendancePct);
+  const startDate = formatMonthYear(profile.joinedDate);
+  const endDate = formatMonthYear(new Date().toISOString());
 
   return (
     <>
       {/* Page Header */}
-      <div style={{ textAlign: "center", marginBottom: "32px" }}>
+      <div style={{ textAlign: "center", marginBottom: "32px" }} className="no-print">
         <span className="bamboo-label">Official Document</span>
         <h1
           style={{
@@ -126,6 +137,7 @@ export function MemberTestimonialView({
 
       {/* Main Card */}
       <div
+        id="testimonial-card"
         className="card-shadow"
         style={{
           background: "var(--cream-white)",
@@ -148,26 +160,40 @@ export function MemberTestimonialView({
             borderBottom: "1px solid rgba(74,124,89,0.12)",
           }}
         >
+          {/* Left: member info */}
           <div>
+            <span className="bamboo-label" style={{ display: "block", marginBottom: "8px" }}>
+              Member Profile
+            </span>
             <p
               style={{
-                fontFamily: "'DM Sans', sans-serif",
-                fontSize: "22px",
-                fontWeight: 600,
-                color: "var(--charcoal-ink)",
+                fontFamily: "'Playfair Display', serif",
+                fontSize: "28px",
+                fontWeight: 700,
+                color: "var(--deep-forest)",
                 marginBottom: "4px",
+                lineHeight: 1.2,
               }}
             >
               {profile.name}
             </p>
-            <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "13px", color: "var(--stone-grey)" }}>
+            <p
+              style={{
+                fontFamily: "'DM Sans', sans-serif",
+                fontSize: "13px",
+                color: "var(--stone-grey)",
+                marginBottom: "4px",
+              }}
+            >
+              Volunteered from {startDate} – {endDate}
+            </p>
+            <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "13px", color: "var(--stone-grey)", marginBottom: "8px" }}>
               {profile.email}
             </p>
             {profile.department && (
               <span
                 style={{
                   display: "inline-block",
-                  marginTop: "8px",
                   padding: "3px 10px",
                   borderRadius: "20px",
                   background: "rgba(168,197,160,0.25)",
@@ -183,15 +209,73 @@ export function MemberTestimonialView({
               </span>
             )}
           </div>
-          <div style={{ textAlign: "right" }}>
-            <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "12px", color: "var(--stone-grey)", marginBottom: "4px" }}>
-              <span style={{ fontWeight: 600, color: "var(--charcoal-ink)" }}>Issue Date: </span>
-              {issueDate}
-            </p>
-            <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "12px", color: "var(--stone-grey)" }}>
-              <span style={{ fontWeight: 600, color: "var(--charcoal-ink)" }}>Reference: </span>
-              {refNumber}
-            </p>
+
+          {/* Right: download button + performance rating */}
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "flex-end",
+              gap: "10px",
+            }}
+          >
+            <button
+              type="button"
+              className="no-print"
+              onClick={() => window.print()}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+                height: "34px",
+                padding: "0 14px",
+                borderRadius: "8px",
+                border: "1px solid rgba(74,124,89,0.30)",
+                background: "transparent",
+                color: "var(--bamboo-green)",
+                fontFamily: "'DM Sans', sans-serif",
+                fontWeight: 600,
+                fontSize: "12px",
+                cursor: "pointer",
+                letterSpacing: "0.04em",
+              }}
+            >
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
+                <path d="M8 1v9M5 7l3 3 3-3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M2 12h12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+              </svg>
+              Download PDF
+            </button>
+
+            <div style={{ textAlign: "right" }}>
+              <span className="bamboo-label" style={{ display: "block", marginBottom: "6px" }}>
+                Issue Date
+              </span>
+              <p
+                style={{
+                  fontFamily: "'Playfair Display', serif",
+                  fontSize: "22px",
+                  fontWeight: 700,
+                  color: "var(--deep-forest)",
+                  lineHeight: 1.25,
+                  margin: 0,
+                }}
+              >
+                Volunteering Performance:
+                <br />
+                {performance.label}
+              </p>
+              <p
+                style={{
+                  fontFamily: "'DM Sans', sans-serif",
+                  fontSize: "12px",
+                  color: "var(--stone-grey)",
+                  marginTop: "4px",
+                }}
+              >
+                {performance.tier}
+              </p>
+            </div>
           </div>
         </div>
 
@@ -377,6 +461,51 @@ export function MemberTestimonialView({
               {endorsement.adminTitle}
             </p>
           </div>
+        ) : viewerRole === "admin" ? (
+          <div
+            style={{
+              background: "rgba(74,124,89,0.04)",
+              borderLeft: "3px solid rgba(74,124,89,0.30)",
+              borderRadius: "0 12px 12px 0",
+              padding: "24px 28px",
+            }}
+          >
+            <span className="bamboo-label" style={{ marginBottom: "10px", display: "block" }}>
+              Executive Endorsement
+            </span>
+            <p
+              style={{
+                fontFamily: "'Playfair Display', serif",
+                fontStyle: "italic",
+                fontSize: "15px",
+                color: "var(--charcoal-ink)",
+                lineHeight: 1.7,
+                marginBottom: "18px",
+              }}
+            >
+              &ldquo;{profile.name} has demonstrated an exceptional commitment to the SYAI community through consistent contributions, strong leadership, and measurable impact across initiatives...&rdquo;
+            </p>
+            <button
+              type="button"
+              onClick={onGenerate}
+              style={{
+                height: "40px",
+                padding: "0 24px",
+                border: "none",
+                borderRadius: "999px",
+                background: "var(--accent-gold)",
+                color: "var(--charcoal-ink)",
+                fontFamily: "'DM Sans', sans-serif",
+                fontWeight: 700,
+                textTransform: "uppercase",
+                letterSpacing: "0.08em",
+                fontSize: "11px",
+                cursor: "pointer",
+              }}
+            >
+              Generate Testimonial
+            </button>
+          </div>
         ) : (
           <div
             style={{
@@ -456,6 +585,20 @@ export function MemberTestimonialView({
         }
         @media (max-width: 540px) {
           .metrics-grid { grid-template-columns: repeat(2, 1fr) !important; }
+        }
+        @media print {
+          body * { visibility: hidden; }
+          #testimonial-card,
+          #testimonial-card * { visibility: visible; }
+          #testimonial-card {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            border-radius: 0 !important;
+            box-shadow: none !important;
+          }
+          .no-print { display: none !important; }
         }
       `}</style>
     </>
