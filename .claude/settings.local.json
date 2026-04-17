@@ -22,7 +22,11 @@
       "Bash(python -c \"import graphify; import inspect; print\\(inspect.getfile\\(graphify\\)\\)\")",
       "Bash(python -c \"from graphify import viz; print\\('viz ok'\\)\")",
       "Bash(python -c \"import graphify.export; print\\(dir\\(graphify.export\\)\\)\")",
-      "Bash(npm test:*)"
+      "Bash(npm test:*)",
+      "Read(//c/Users/User/.claude/skills/learned//**)",
+      "Read(//c/Users/User/.claude/skills/continuous-learning//**)",
+      "Bash(python3 -c ' *)",
+      "Bash(python3 *)"
     ]
   },
   "enableAllProjectMcpServers": true,

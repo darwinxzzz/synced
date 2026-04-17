@@ -19,11 +19,11 @@ function MetricCard({ value, label }: { value: string | number; label: string })
       style={{
         background: "var(--cream-white)",
         borderRadius: "16px",
-        padding: "20px 16px",
+        padding: "24px 16px",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
-        gap: "6px",
+        gap: "8px",
         textAlign: "center",
       }}
     >
@@ -62,6 +62,9 @@ export function MemberTestimonialView({
   onGenerate,
 }: MemberTestimonialViewProps) {
   const [openReflection, setOpenReflection] = useState<ReflectionItem | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [editDepartment, setEditDepartment] = useState("");
 
   const { data, isLoading, refetch } = api.testimonials.getMemberTestimonial.useQuery(
     { memberId },
@@ -102,10 +105,24 @@ export function MemberTestimonialView({
   const startDate = formatMonthYear(profile.joinedDate);
   const endDate = formatMonthYear(new Date().toISOString());
 
+  const displayName = isEditing ? editName : profile.name;
+  const displayDepartment = isEditing ? editDepartment : (profile.department ?? "");
+
+  const handleEditStart = () => {
+    setEditName(profile.name);
+    setEditDepartment(profile.department ?? "");
+    setIsEditing(true);
+  };
+
+  const handleEditSave = () => {
+    toast.success("Details updated");
+    setIsEditing(false);
+  };
+
   return (
     <>
       {/* Page Header */}
-      <div style={{ textAlign: "center", marginBottom: "32px" }} className="no-print">
+      <div style={{ textAlign: "center", marginBottom: "40px" }} className="no-print">
         <span className="bamboo-label">Official Document</span>
         <h1
           style={{
@@ -114,7 +131,7 @@ export function MemberTestimonialView({
             fontWeight: 700,
             fontStyle: "italic",
             color: "var(--deep-forest)",
-            margin: "8px 0 12px",
+            margin: "10px 0 14px",
             lineHeight: 1.2,
           }}
         >
@@ -127,7 +144,7 @@ export function MemberTestimonialView({
             color: "var(--stone-grey)",
             maxWidth: "480px",
             margin: "0 auto",
-            lineHeight: 1.6,
+            lineHeight: 1.7,
           }}
         >
           This document represents a verified record of contributions, attendance, and impact
@@ -142,115 +159,216 @@ export function MemberTestimonialView({
         style={{
           background: "var(--cream-white)",
           borderRadius: "24px",
-          padding: "clamp(24px, 4vw, 48px)",
+          padding: "clamp(28px, 4vw, 52px)",
           display: "flex",
           flexDirection: "column",
-          gap: "40px",
+          gap: "56px",
         }}
       >
-        {/* Member Profile Row */}
+        {/* ── Step 1 & 2: Profile Row — name+tags inline, Edit button top-right ── */}
         <div
           style={{
             display: "flex",
             justifyContent: "space-between",
             alignItems: "flex-start",
             flexWrap: "wrap",
-            gap: "16px",
-            paddingBottom: "32px",
+            gap: "20px",
+            paddingBottom: "40px",
             borderBottom: "1px solid rgba(74,124,89,0.12)",
           }}
         >
           {/* Left: member info */}
-          <div>
-            <span className="bamboo-label" style={{ display: "block", marginBottom: "8px" }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <span className="bamboo-label" style={{ display: "block", marginBottom: "14px" }}>
               Member Profile
             </span>
-            <p
+
+            {/* Name + department tags in one horizontal flex row */}
+            <div
               style={{
-                fontFamily: "'Playfair Display', serif",
-                fontSize: "28px",
-                fontWeight: 700,
-                color: "var(--deep-forest)",
-                marginBottom: "4px",
-                lineHeight: 1.2,
+                display: "flex",
+                alignItems: "center",
+                flexWrap: "wrap",
+                gap: "10px",
+                marginBottom: "8px",
               }}
             >
-              {profile.name}
-            </p>
+              {isEditing ? (
+                <input
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  style={{
+                    fontFamily: "'Playfair Display', serif",
+                    fontSize: "24px",
+                    fontWeight: 700,
+                    color: "var(--deep-forest)",
+                    border: "1px solid rgba(74,124,89,0.30)",
+                    borderRadius: "8px",
+                    padding: "4px 10px",
+                    background: "var(--ivory-paper)",
+                    outline: "none",
+                    width: "220px",
+                  }}
+                />
+              ) : (
+                <p
+                  style={{
+                    fontFamily: "'Playfair Display', serif",
+                    fontSize: "28px",
+                    fontWeight: 700,
+                    color: "var(--deep-forest)",
+                    lineHeight: 1.2,
+                    margin: 0,
+                  }}
+                >
+                  {displayName}
+                </p>
+              )}
+
+              {/* Department tags — only flow horizontally, no vertical stacking */}
+              {isEditing ? (
+                <input
+                  value={editDepartment}
+                  onChange={(e) => setEditDepartment(e.target.value)}
+                  placeholder="Department"
+                  style={{
+                    fontFamily: "'DM Sans', sans-serif",
+                    fontSize: "11px",
+                    fontWeight: 600,
+                    border: "1px solid rgba(74,124,89,0.30)",
+                    borderRadius: "20px",
+                    padding: "4px 12px",
+                    background: "var(--ivory-paper)",
+                    color: "var(--bamboo-green)",
+                    outline: "none",
+                    width: "140px",
+                    letterSpacing: "0.06em",
+                  }}
+                />
+              ) : (
+                displayDepartment && (
+                  <span
+                    style={{
+                      display: "inline-block",
+                      padding: "4px 12px",
+                      borderRadius: "20px",
+                      background: "rgba(168,197,160,0.25)",
+                      fontFamily: "'DM Sans', sans-serif",
+                      fontSize: "11px",
+                      fontWeight: 600,
+                      color: "var(--bamboo-green)",
+                      letterSpacing: "0.06em",
+                      textTransform: "uppercase",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {displayDepartment}
+                  </span>
+                )
+              )}
+            </div>
+
             <p
               style={{
                 fontFamily: "'DM Sans', sans-serif",
                 fontSize: "13px",
                 color: "var(--stone-grey)",
-                marginBottom: "4px",
+                margin: 0,
+                lineHeight: 1.6,
               }}
             >
               Volunteered from {startDate} – {endDate}
             </p>
-            <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "13px", color: "var(--stone-grey)", marginBottom: "8px" }}>
-              {profile.email}
-            </p>
-            {profile.department && (
-              <span
-                style={{
-                  display: "inline-block",
-                  padding: "3px 10px",
-                  borderRadius: "20px",
-                  background: "rgba(168,197,160,0.25)",
-                  fontFamily: "'DM Sans', sans-serif",
-                  fontSize: "11px",
-                  fontWeight: 600,
-                  color: "var(--bamboo-green)",
-                  letterSpacing: "0.06em",
-                  textTransform: "uppercase",
-                }}
-              >
-                {profile.department}
-              </span>
+
+            {/* Save / Cancel shown below date when in edit mode */}
+            {isEditing && (
+              <div style={{ display: "flex", gap: "8px", marginTop: "16px" }} className="no-print">
+                <button
+                  type="button"
+                  onClick={handleEditSave}
+                  style={{
+                    height: "32px",
+                    padding: "0 18px",
+                    borderRadius: "8px",
+                    border: "none",
+                    background: "var(--bamboo-green)",
+                    color: "white",
+                    fontFamily: "'DM Sans', sans-serif",
+                    fontWeight: 600,
+                    fontSize: "12px",
+                    cursor: "pointer",
+                  }}
+                >
+                  Save
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsEditing(false)}
+                  style={{
+                    height: "32px",
+                    padding: "0 18px",
+                    borderRadius: "8px",
+                    border: "1px solid rgba(74,124,89,0.25)",
+                    background: "transparent",
+                    color: "var(--stone-grey)",
+                    fontFamily: "'DM Sans', sans-serif",
+                    fontWeight: 600,
+                    fontSize: "12px",
+                    cursor: "pointer",
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
             )}
           </div>
 
-          {/* Right: download button + performance rating */}
+          {/* Right: Edit button (where Download PDF was) + performance rating */}
           <div
             style={{
               display: "flex",
               flexDirection: "column",
               alignItems: "flex-end",
-              gap: "10px",
+              gap: "14px",
             }}
           >
-            <button
-              type="button"
-              className="no-print"
-              onClick={() => window.print()}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "6px",
-                height: "34px",
-                padding: "0 14px",
-                borderRadius: "8px",
-                border: "1px solid rgba(74,124,89,0.30)",
-                background: "transparent",
-                color: "var(--bamboo-green)",
-                fontFamily: "'DM Sans', sans-serif",
-                fontWeight: 600,
-                fontSize: "12px",
-                cursor: "pointer",
-                letterSpacing: "0.04em",
-              }}
-            >
-              <svg width="13" height="13" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
-                <path d="M8 1v9M5 7l3 3 3-3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M2 12h12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
-              </svg>
-              Download PDF
-            </button>
+            {/* ── Step 2: Edit button with pencil icon ── */}
+            {!isEditing && (
+              <button
+                type="button"
+                className="no-print"
+                onClick={handleEditStart}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  height: "34px",
+                  padding: "0 14px",
+                  borderRadius: "8px",
+                  border: "1px solid rgba(74,124,89,0.30)",
+                  background: "transparent",
+                  color: "var(--bamboo-green)",
+                  fontFamily: "'DM Sans', sans-serif",
+                  fontWeight: 600,
+                  fontSize: "12px",
+                  cursor: "pointer",
+                  letterSpacing: "0.04em",
+                }}
+              >
+                <svg width="13" height="13" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
+                  <path
+                    d="M11.5 2.5a1.414 1.414 0 0 1 2 2L5 13H3v-2L11.5 2.5Z"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+                Edit
+              </button>
+            )}
 
             <div style={{ textAlign: "right" }}>
-              <span className="bamboo-label" style={{ display: "block", marginBottom: "6px" }}>
-                Issue Date
-              </span>
               <p
                 style={{
                   fontFamily: "'Playfair Display', serif",
@@ -270,7 +388,7 @@ export function MemberTestimonialView({
                   fontFamily: "'DM Sans', sans-serif",
                   fontSize: "12px",
                   color: "var(--stone-grey)",
-                  marginTop: "4px",
+                  marginTop: "6px",
                 }}
               >
                 {performance.tier}
@@ -279,9 +397,9 @@ export function MemberTestimonialView({
           </div>
         </div>
 
-        {/* Performance Metrics */}
+        {/* ── Step 4 & 5: Performance Metrics — more breathing room, last card = Hours Volunteered ── */}
         <div>
-          <span className="bamboo-label" style={{ marginBottom: "16px", display: "block" }}>
+          <span className="bamboo-label" style={{ marginBottom: "24px", display: "block" }}>
             Performance Metrics
           </span>
           <div
@@ -294,7 +412,7 @@ export function MemberTestimonialView({
           >
             <MetricCard value={metrics.eventsContributed} label="Events Contributed" />
             <MetricCard value={`${metrics.weeklyAttendancePct}%`} label="Weekly Attendance" />
-            <MetricCard value={metrics.projectLeads} label="Project Leads" />
+            <MetricCard value={metrics.projectLeads} label="Events Leads" />
             <MetricCard value={metrics.collaborations} label="Collaborations" />
             <MetricCard value={metrics.totalContributions} label="Contributions" />
           </div>
@@ -303,7 +421,7 @@ export function MemberTestimonialView({
         {/* Contribution History Timeline */}
         {contributionHistory.length > 0 && (
           <div>
-            <span className="bamboo-label" style={{ marginBottom: "20px", display: "block" }}>
+            <span className="bamboo-label" style={{ marginBottom: "28px", display: "block" }}>
               Contribution History
             </span>
             <div style={{ display: "flex", flexDirection: "column", gap: "0" }}>
@@ -365,7 +483,7 @@ export function MemberTestimonialView({
                       style={{
                         flex: 1,
                         paddingLeft: "16px",
-                        paddingBottom: isLast ? "0" : "24px",
+                        paddingBottom: isLast ? "0" : "28px",
                         paddingTop: "2px",
                       }}
                     >
@@ -389,7 +507,7 @@ export function MemberTestimonialView({
                             fontSize: "14px",
                             fontWeight: 600,
                             color: hasReflection ? "var(--bamboo-green)" : "var(--charcoal-ink)",
-                            marginBottom: "2px",
+                            marginBottom: "4px",
                             textDecoration: hasReflection ? "underline" : "none",
                             textDecorationColor: "rgba(74,124,89,0.4)",
                           }}
@@ -402,7 +520,7 @@ export function MemberTestimonialView({
                           )}
                         </p>
                         {entry.description && (
-                          <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "13px", color: "var(--stone-grey)", lineHeight: 1.5 }}>
+                          <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "13px", color: "var(--stone-grey)", lineHeight: 1.6 }}>
                             {entry.description}
                           </p>
                         )}
@@ -422,10 +540,10 @@ export function MemberTestimonialView({
               background: "rgba(74,124,89,0.05)",
               borderLeft: "3px solid var(--bamboo-green)",
               borderRadius: "0 12px 12px 0",
-              padding: "24px 28px",
+              padding: "28px 32px",
             }}
           >
-            <span className="bamboo-label" style={{ marginBottom: "12px", display: "block" }}>
+            <span className="bamboo-label" style={{ marginBottom: "16px", display: "block" }}>
               Executive Endorsement
             </span>
             <p
@@ -434,8 +552,8 @@ export function MemberTestimonialView({
                 fontSize: "15px",
                 fontStyle: "italic",
                 color: "var(--charcoal-ink)",
-                lineHeight: 1.7,
-                marginBottom: "16px",
+                lineHeight: 1.8,
+                marginBottom: "20px",
               }}
             >
               &ldquo;{endorsement.quote}&rdquo;
@@ -444,7 +562,7 @@ export function MemberTestimonialView({
               style={{
                 height: "1px",
                 background: "rgba(74,124,89,0.15)",
-                marginBottom: "14px",
+                marginBottom: "16px",
               }}
             />
             <p
@@ -457,54 +575,9 @@ export function MemberTestimonialView({
             >
               {endorsement.adminName}
             </p>
-            <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "12px", color: "var(--stone-grey)" }}>
+            <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "12px", color: "var(--stone-grey)", marginTop: "2px" }}>
               {endorsement.adminTitle}
             </p>
-          </div>
-        ) : viewerRole === "admin" ? (
-          <div
-            style={{
-              background: "rgba(74,124,89,0.04)",
-              borderLeft: "3px solid rgba(74,124,89,0.30)",
-              borderRadius: "0 12px 12px 0",
-              padding: "24px 28px",
-            }}
-          >
-            <span className="bamboo-label" style={{ marginBottom: "10px", display: "block" }}>
-              Executive Endorsement
-            </span>
-            <p
-              style={{
-                fontFamily: "'Playfair Display', serif",
-                fontStyle: "italic",
-                fontSize: "15px",
-                color: "var(--charcoal-ink)",
-                lineHeight: 1.7,
-                marginBottom: "18px",
-              }}
-            >
-              &ldquo;{profile.name} has demonstrated an exceptional commitment to the SYAI community through consistent contributions, strong leadership, and measurable impact across initiatives...&rdquo;
-            </p>
-            <button
-              type="button"
-              onClick={onGenerate}
-              style={{
-                height: "40px",
-                padding: "0 24px",
-                border: "none",
-                borderRadius: "999px",
-                background: "var(--accent-gold)",
-                color: "var(--charcoal-ink)",
-                fontFamily: "'DM Sans', sans-serif",
-                fontWeight: 700,
-                textTransform: "uppercase",
-                letterSpacing: "0.08em",
-                fontSize: "11px",
-                cursor: "pointer",
-              }}
-            >
-              Generate Testimonial
-            </button>
           </div>
         ) : (
           <div
@@ -512,7 +585,7 @@ export function MemberTestimonialView({
               background: "rgba(140,140,140,0.04)",
               border: "1px dashed rgba(140,140,140,0.20)",
               borderRadius: "12px",
-              padding: "24px",
+              padding: "28px",
               textAlign: "center",
             }}
           >

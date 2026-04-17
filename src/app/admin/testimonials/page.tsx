@@ -7,7 +7,6 @@ import { Bell, Search } from "lucide-react";
 import { api } from "~/trpc/react";
 
 const TABS = [
-  { key: "directory", label: "Directory" },
   { key: "testimonial_requests", label: "Testimonial Requests" },
   { key: "onboarding", label: "Onboarding" },
 ] as const;
@@ -43,6 +42,10 @@ function KPI({ label, value, accent }: { label: string; value: number; accent?: 
   );
 }
 
+function getInitials(name: string): string {
+  return name.split(" ").slice(0, 2).map((p) => p[0]?.toUpperCase() ?? "").join("");
+}
+
 export default function AdminTestimonialsPage() {
   const [tab, setTab] = useState<TabKey>("testimonial_requests");
   const [department, setDepartment] = useState("all");
@@ -56,6 +59,7 @@ export default function AdminTestimonialsPage() {
   });
 
   const cards = useMemo(() => data?.cards ?? [], [data?.cards]);
+  const requestCards = useMemo(() => cards.filter((c) => c.hasRequest), [cards]);
 
   return (
     <div style={{ minHeight: "100vh", background: "var(--ivory-paper)", paddingBottom: 40 }}>
@@ -172,7 +176,7 @@ export default function AdminTestimonialsPage() {
         >
           <KPI label="Total Members" value={data?.kpi.totalMembers ?? 0} />
           <KPI label="Active Members" value={data?.kpi.activeMembers ?? 0} />
-          <KPI label="Departments" value={data?.kpi.departments ?? 0} />
+          <KPI label="Testimonial Requests" value={data?.kpi.testimonialRequests ?? 0} accent />
           <KPI label="Pending Requests" value={data?.kpi.pendingRequests ?? 0} accent />
         </motion.div>
 
@@ -240,31 +244,222 @@ export default function AdminTestimonialsPage() {
               fontFamily: "'DM Sans', sans-serif",
             }}
           >
-            {cards.length} requests found
+            {tab === "onboarding" ? `${cards.length} members` : `${requestCards.length} requests`}
           </span>
         </motion.div>
 
-        {tab !== "testimonial_requests" ? (
-          <div
-            className="card-shadow"
-            style={{
-              marginTop: 20,
-              borderRadius: 18,
-              background: "var(--cream-white)",
-              border: "1px solid rgba(140,140,140,0.10)",
-              padding: 24,
-            }}
-          >
-            <p style={{ margin: 0, fontFamily: "'DM Sans', sans-serif", color: "var(--stone-grey)", fontSize: 13 }}>
-              {tab === "directory"
-                ? "Directory mode can be layered on top of this same dataset."
-                : "Onboarding testimonial queue can be layered on top of this same dataset."}
-            </p>
-          </div>
-        ) : (
-          <AnimatePresence mode="wait">
+        <AnimatePresence mode="wait">
+          {tab === "onboarding" ? (
+            /* ── Onboarding: Notion-style table list ── */
             <motion.div
-              key={`${department}-${status}-${search}`}
+              key="onboarding"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.18 }}
+              style={{ marginTop: 18, paddingBottom: 24 }}
+            >
+              {/* Section header */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+                <span className="bamboo-label">Onboarding</span>
+                <span
+                  style={{
+                    padding: "4px 12px",
+                    borderRadius: 999,
+                    background: "var(--deep-forest)",
+                    color: "var(--cream-white)",
+                    fontSize: 10,
+                    letterSpacing: "0.08em",
+                    textTransform: "uppercase",
+                    fontWeight: 700,
+                    fontFamily: "'DM Sans', sans-serif",
+                  }}
+                >
+                  {cards.length} members
+                </span>
+              </div>
+
+              {/* List container */}
+              <div
+                className="card-shadow"
+                style={{
+                  background: "var(--cream-white)",
+                  borderRadius: 20,
+                  padding: "8px 0",
+                  overflow: "hidden",
+                }}
+              >
+                {isPending ? (
+                  Array.from({ length: 5 }).map((_, i) => (
+                    <div
+                      key={i}
+                      style={{
+                        height: 72,
+                        margin: "4px 16px",
+                        borderRadius: 14,
+                        background: "var(--ivory-paper)",
+                        opacity: 0.5,
+                      }}
+                    />
+                  ))
+                ) : cards.length === 0 ? (
+                  <div
+                    style={{
+                      margin: 24,
+                      padding: "32px 24px",
+                      border: "1px dashed rgba(140,140,140,0.25)",
+                      borderRadius: 14,
+                      textAlign: "center",
+                    }}
+                  >
+                    <p style={{ margin: 0, fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "var(--stone-grey)", fontStyle: "italic" }}>
+                      No members pending onboarding.
+                    </p>
+                  </div>
+                ) : (
+                  cards.map((card, index) => (
+                    <motion.div
+                      key={card.memberId}
+                      initial={{ opacity: 0, x: -6 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: index * 0.025 }}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 14,
+                        padding: "16px 20px",
+                        borderBottom: index < cards.length - 1 ? "1px solid rgba(140,140,140,0.08)" : "none",
+                        transition: "background 0.15s",
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(168,197,160,0.08)"; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                    >
+                      {/* Avatar */}
+                      <div
+                        style={{
+                          width: 44,
+                          height: 44,
+                          borderRadius: "50%",
+                          background: "var(--sage-mist)",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontWeight: 700,
+                          fontSize: 14,
+                          color: "var(--deep-forest)",
+                          fontFamily: "'DM Sans', sans-serif",
+                          flexShrink: 0,
+                        }}
+                      >
+                        {getInitials(card.name)}
+                      </div>
+
+                      {/* Name + department */}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                          <p
+                            style={{
+                              margin: 0,
+                              fontFamily: "'Playfair Display', serif",
+                              fontWeight: 700,
+                              fontSize: 17,
+                              color: "var(--deep-forest)",
+                              lineHeight: 1.2,
+                            }}
+                          >
+                            {card.name}
+                          </p>
+                          <span
+                            style={{
+                              padding: "2px 9px",
+                              borderRadius: 999,
+                              background: "rgba(74,124,89,0.12)",
+                              fontFamily: "'DM Sans', sans-serif",
+                              fontSize: 10,
+                              fontWeight: 600,
+                              color: "var(--bamboo-green)",
+                              letterSpacing: "0.07em",
+                              textTransform: "uppercase",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {card.department}
+                          </span>
+                        </div>
+                        <p style={{ margin: "3px 0 0", fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: "var(--stone-grey)" }}>
+                          {card.tenure}
+                        </p>
+                      </div>
+
+                      {/* Stats */}
+                      <div style={{ display: "flex", gap: 20, flexShrink: 0 }} className="onboarding-stats">
+                        <div style={{ textAlign: "center" }}>
+                          <p style={{ margin: 0, fontFamily: "'DM Sans', sans-serif", fontSize: 16, fontWeight: 700, color: "var(--deep-forest)" }}>{card.stats.events}</p>
+                          <p className="bamboo-label" style={{ margin: "2px 0 0", fontSize: 9, opacity: 0.7 }}>Events</p>
+                        </div>
+                        <div style={{ textAlign: "center" }}>
+                          <p style={{ margin: 0, fontFamily: "'DM Sans', sans-serif", fontSize: 16, fontWeight: 700, color: "var(--deep-forest)" }}>{card.stats.attendancePct}%</p>
+                          <p className="bamboo-label" style={{ margin: "2px 0 0", fontSize: 9, opacity: 0.7 }}>Attendance</p>
+                        </div>
+                      </div>
+
+                      {/* Status pill */}
+                      <span
+                        style={{
+                          padding: "4px 11px",
+                          borderRadius: 999,
+                          border: card.requestStatus === "sent"
+                            ? "1px solid rgba(74,124,89,0.45)"
+                            : "1px solid rgba(196,163,90,0.55)",
+                          color: card.requestStatus === "sent" ? "var(--bamboo-green)" : "var(--accent-gold)",
+                          fontFamily: "'DM Sans', sans-serif",
+                          fontSize: 10,
+                          fontWeight: 700,
+                          letterSpacing: "0.07em",
+                          textTransform: "uppercase",
+                          whiteSpace: "nowrap",
+                          flexShrink: 0,
+                        }}
+                      >
+                        {card.requestStatus === "sent" ? "Ready" : "Pending Review"}
+                      </span>
+
+                      {/* Action */}
+                      <Link
+                        href={`/admin/testimonials/${card.memberId}`}
+                        style={{
+                          height: 32,
+                          padding: "0 16px",
+                          borderRadius: 999,
+                          border: "1px solid rgba(74,124,89,0.35)",
+                          color: "var(--bamboo-green)",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          textDecoration: "none",
+                          fontFamily: "'DM Sans', sans-serif",
+                          fontSize: 11,
+                          fontWeight: 700,
+                          letterSpacing: "0.07em",
+                          textTransform: "uppercase",
+                          whiteSpace: "nowrap",
+                          flexShrink: 0,
+                          transition: "background 0.15s",
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(74,124,89,0.06)"; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                      >
+                        Begin Onboarding
+                      </Link>
+                    </motion.div>
+                  ))
+                )}
+              </div>
+            </motion.div>
+          ) : (
+            /* ── Testimonial Requests: card grid ── */
+            <motion.div
+              key={`requests-${department}-${status}-${search}`}
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -8 }}
@@ -280,7 +475,23 @@ export default function AdminTestimonialsPage() {
                       style={{ borderRadius: 20, minHeight: 300, background: "var(--cream-white)", opacity: 0.5 }}
                     />
                   ))
-                : cards.map((card, index) => (
+                : requestCards.length === 0
+                ? (
+                    <div
+                      style={{
+                        gridColumn: "1 / -1",
+                        padding: "48px 24px",
+                        border: "1px dashed rgba(140,140,140,0.25)",
+                        borderRadius: 14,
+                        textAlign: "center",
+                      }}
+                    >
+                      <p style={{ margin: 0, fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "var(--stone-grey)", fontStyle: "italic" }}>
+                        No testimonial requests found.
+                      </p>
+                    </div>
+                  )
+                : requestCards.map((card, index) => (
                     <motion.article
                       key={card.memberId}
                       initial={{ opacity: 0, y: 10 }}
@@ -312,11 +523,7 @@ export default function AdminTestimonialsPage() {
                             fontFamily: "'DM Sans', sans-serif",
                           }}
                         >
-                          {card.name
-                            .split(" ")
-                            .slice(0, 2)
-                            .map((part) => part[0]?.toUpperCase() ?? "")
-                            .join("")}
+                          {getInitials(card.name)}
                         </div>
                         <div>
                           <p style={{ margin: 0, fontFamily: "'DM Sans', sans-serif", fontSize: 22, color: "var(--deep-forest)", fontWeight: 700, lineHeight: 1.05 }}>
@@ -332,7 +539,7 @@ export default function AdminTestimonialsPage() {
 
                       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 6 }}>
                         <StatPill label="Events" value={card.stats.events} />
-                        <StatPill label="Hours" value={card.stats.hours} />
+                        <StatPill label="Contributions" value={card.stats.contributions} />
                         <StatPill label="Attendance" value={`${card.stats.attendancePct}%`} />
                       </div>
 
@@ -395,8 +602,8 @@ export default function AdminTestimonialsPage() {
                     </motion.article>
                   ))}
             </motion.div>
-          </AnimatePresence>
-        )}
+          )}
+        </AnimatePresence>
       </div>
 
       <style>{`
@@ -409,6 +616,7 @@ export default function AdminTestimonialsPage() {
         @media (max-width: 700px) {
           .testimonial-grid { grid-template-columns: 1fr !important; }
           .testimonial-kpi-grid { grid-template-columns: 1fr !important; }
+          .onboarding-stats { display: none !important; }
         }
       `}</style>
     </div>

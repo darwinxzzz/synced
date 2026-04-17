@@ -239,11 +239,12 @@ export const testimonialsRouter = createTRPCRouter({
         throw new TRPCError({ code: "FORBIDDEN", message: "Admin only" })
       }
 
-      const [totalMembersRes, activeMembersRes, pendingReqRes, departmentsRes] = await Promise.all([
+      const [totalMembersRes, activeMembersRes, pendingReqRes, departmentsRes, totalReqRes] = await Promise.all([
         ctx.supabase.from("profiles").select("id", { count: "exact", head: true }).eq("role", "member"),
         ctx.supabase.from("profiles").select("id", { count: "exact", head: true }).eq("role", "member").eq("status", "active"),
         ctx.supabase.from("testimonial_requests").select("id", { count: "exact", head: true }).eq("status", "pending"),
         ctx.supabase.from("profiles").select("department").eq("role", "member").not("department", "is", null),
+        ctx.supabase.from("testimonial_requests").select("id", { count: "exact", head: true }),
       ])
 
       let membersQuery = ctx.supabase
@@ -270,7 +271,7 @@ export const testimonialsRouter = createTRPCRouter({
           kpi: {
             totalMembers: totalMembersRes.count ?? 0,
             activeMembers: activeMembersRes.count ?? 0,
-            departments: deptSet.size,
+            testimonialRequests: totalReqRes.count ?? 0,
             pendingRequests: pendingReqRes.count ?? 0,
           },
           departments: Array.from(deptSet).sort(),
@@ -301,7 +302,7 @@ export const testimonialsRouter = createTRPCRouter({
         .from("attendance")
         .select("user_id, status")
         .in("user_id", memberIds)
-        .eq("type", "event")
+        .eq("type", "weekly_meeting")
 
       if (attendanceError) {
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: attendanceError.message })
@@ -387,7 +388,7 @@ export const testimonialsRouter = createTRPCRouter({
           }
 
           const req = requestsMap.get(member.id)
-          const requestStatus = req?.status ?? "pending"
+          const requestStatus = req?.status ?? "none"
           const joinedAt = member.joined_date ? new Date(member.joined_date) : null
           const monthDiff = joinedAt
             ? Math.max(
@@ -405,11 +406,12 @@ export const testimonialsRouter = createTRPCRouter({
             tenure: `${monthDiff} month${monthDiff === 1 ? "" : "s"} at SYAI`,
             stats: {
               events: eventCount,
-              hours: memberContributions.length * 8,
+              contributions: memberContributions.length,
               attendancePct,
             },
             quoteSnippet,
             requestStatus,
+            hasRequest: !!req,
           }
         })
         .filter((card) => {
@@ -422,7 +424,7 @@ export const testimonialsRouter = createTRPCRouter({
         kpi: {
           totalMembers: totalMembersRes.count ?? 0,
           activeMembers: activeMembersRes.count ?? 0,
-          departments: deptSet.size,
+          testimonialRequests: totalReqRes.count ?? 0,
           pendingRequests: pendingReqRes.count ?? 0,
         },
         departments: Array.from(deptSet).sort(),
