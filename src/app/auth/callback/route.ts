@@ -43,8 +43,7 @@ export async function GET(request: Request) {
         return NextResponse.redirect(`${origin}/login?error=pending_approval`)
       }
 
-      // TODO: redirect admins to /admin/dashboard once that page is built
-      const dest = '/member/dashboard'
+      const dest = profile.role === 'admin' ? '/admin/dashboard' : '/member/dashboard'
       return NextResponse.redirect(`${origin}${dest}`)
     }
   }

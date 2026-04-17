@@ -10,9 +10,14 @@ export const attendanceRouter = createTRPCRouter({
 
   // ── KPIs ──────────────────────────────────────────────────────────────────
   getKPIs: adminProcedure.query(async ({ ctx }) => {
+    const today = new Date().toISOString().split("T")[0]!
+
+    // Only count past events (attendance registry tracks what already happened)
     const { data: events, error: evErr } = await ctx.supabase
       .from("events")
       .select("id, name")
+      .lt("date", today)
+      .neq("status", "draft")
 
     if (evErr) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: evErr.message })
 
@@ -27,28 +32,46 @@ export const attendanceRouter = createTRPCRouter({
       }
     }
 
-    const { data: attendanceRows, error: attErr } = await ctx.supabase
-      .from("attendance")
-      .select("event_id, status")
-      .eq("type", "event")
+    const eventIds = (events ?? []).map((e) => e.id)
 
-    if (attErr) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: attErr.message })
+    const [attResult, emResult] = await Promise.all([
+      ctx.supabase
+        .from("attendance")
+        .select("event_id, status")
+        .eq("type", "event")
+        .in("event_id", eventIds),
+      ctx.supabase
+        .from("event_members")
+        .select("event_id")
+        .in("event_id", eventIds),
+    ])
 
-    const statsMap = new Map<string, { attended: number; total: number; name: string }>()
-    for (const ev of events ?? []) {
-      statsMap.set(ev.id, { attended: 0, total: 0, name: ev.name })
+    if (attResult.error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: attResult.error.message })
+
+    // Build member count per event from event_members (real denominator)
+    const memberCountMap = new Map<string, number>()
+    for (const row of emResult.data ?? []) {
+      memberCountMap.set(row.event_id, (memberCountMap.get(row.event_id) ?? 0) + 1)
     }
-    for (const row of attendanceRows ?? []) {
+
+    const statsMap = new Map<string, { attended: number; name: string }>()
+    for (const ev of events ?? []) {
+      statsMap.set(ev.id, { attended: 0, name: ev.name })
+    }
+    for (const row of attResult.data ?? []) {
       if (!row.event_id) continue
       const stat = statsMap.get(row.event_id)
       if (!stat) continue
-      stat.total++
       if (row.status === "attended") stat.attended++
     }
 
-    const rates = Array.from(statsMap.values())
-      .filter((s) => s.total > 0)
-      .map((s) => ({ name: s.name, pct: Math.round((s.attended / s.total) * 100) }))
+    // Rate = attended / total assigned members for that event (only events with assigned members)
+    const rates = Array.from(statsMap.entries())
+      .filter(([id]) => (memberCountMap.get(id) ?? 0) > 0)
+      .map(([id, stat]) => ({
+        name: stat.name,
+        pct: Math.round((stat.attended / memberCountMap.get(id)!) * 100),
+      }))
 
     const avgAttendance = rates.length
       ? Math.round(rates.reduce((acc, r) => acc + r.pct, 0) / rates.length)
@@ -97,7 +120,7 @@ export const attendanceRouter = createTRPCRouter({
       if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message })
 
       const memberIds = (profiles ?? []).map((p) => p.id)
-      const attendanceStats: Record<string, { total: number; attended: number }> = {}
+      const attendanceStats: Record<string, { attended: number }> = {}
       const eventMemberCounts: Record<string, number> = {}
 
       if (memberIds.length > 0) {
@@ -114,13 +137,8 @@ export const attendanceRouter = createTRPCRouter({
         ])
 
         for (const row of attResult.data ?? []) {
-          const prev = attendanceStats[row.user_id]
-          if (!prev) {
-            attendanceStats[row.user_id] = { total: 1, attended: row.status === "attended" ? 1 : 0 }
-          } else {
-            prev.total++
-            if (row.status === "attended") prev.attended++
-          }
+          if (!attendanceStats[row.user_id]) attendanceStats[row.user_id] = { attended: 0 }
+          if (row.status === "attended") attendanceStats[row.user_id]!.attended++
         }
 
         for (const row of emResult.data ?? []) {
@@ -131,9 +149,11 @@ export const attendanceRouter = createTRPCRouter({
       const members = (profiles ?? []).map((p) => ({
         ...p,
         total_events: eventMemberCounts[p.id] ?? 0,
+        // Denominator is total events the member is assigned to, not just recorded ones
         attendance_pct: (() => {
-          const stat = attendanceStats[p.id]
-          return stat ? Math.round((stat.attended / stat.total) * 100) : 0
+          const attended = attendanceStats[p.id]?.attended ?? 0
+          const totalAssigned = eventMemberCounts[p.id] ?? 0
+          return totalAssigned > 0 ? Math.round((attended / totalAssigned) * 100) : 0
         })(),
       }))
 
