@@ -41,7 +41,7 @@ export function MemberTestimonialView({
   memberId,
   headerOverride,
   viewerRole = "member",
-  onGenerate,
+  onGenerate: _onGenerate,
 }: MemberTestimonialViewProps) {
   const [openReflection, setOpenReflection] = useState<ReflectionItem | null>(null);
   const [isEditing, setIsEditing] = useState(false);

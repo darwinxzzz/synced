@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
+import Image from "next/image"
 import { Search, X } from "lucide-react"
 
 export interface AssignableMember {
@@ -32,10 +33,12 @@ function getInitials(name: string): string {
 function MemberAvatar({ member, size = 32 }: { member: AssignableMember; size?: number }) {
   if (member.avatar_url) {
     return (
-      <img
+      <Image
         src={member.avatar_url}
         alt={member.name}
-        style={{ width: size, height: size, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }}
+        width={size}
+        height={size}
+        style={{ borderRadius: "50%", objectFit: "cover", flexShrink: 0 }}
       />
     )
   }
@@ -77,7 +80,7 @@ export function MemberAssignmentSection({
     return () => clearTimeout(t)
   }, [search])
 
-  const addedIds = new Set(addedMembers.map((m) => m.id))
+  const addedIds = useMemo(() => new Set(addedMembers.map((m) => m.id)), [addedMembers])
 
   const filtered = debouncedSearch
     ? allMembers.filter(

@@ -1,4 +1,4 @@
-import { createTRPCRouter, protectedProcedure, adminProcedure } from "~/server/api/trpc"
+import { createTRPCRouter, adminProcedure } from "~/server/api/trpc"
 import { z } from "zod"
 import { TRPCError } from "@trpc/server"
 import { createAdminClient } from "~/lib/supabase/admin"
@@ -137,7 +137,7 @@ export const attendanceRouter = createTRPCRouter({
         ])
 
         for (const row of attResult.data ?? []) {
-          if (!attendanceStats[row.user_id]) attendanceStats[row.user_id] = { attended: 0 }
+          attendanceStats[row.user_id] ??= { attended: 0 }
           if (row.status === "attended") attendanceStats[row.user_id]!.attended++
         }
 

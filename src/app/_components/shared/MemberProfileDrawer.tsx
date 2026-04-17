@@ -1,5 +1,6 @@
 "use client"
 
+import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { Mail, Building2, CalendarDays, LogOut, CalendarCheck } from "lucide-react"
 import { SlideDrawer } from "./SlideDrawer"
@@ -70,10 +71,12 @@ function MemberViewContent({ memberId }: { memberId: string }) {
       {/* Avatar + name */}
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: 28 }}>
         {profile.avatar_url ? (
-          <img
+          <Image
             src={profile.avatar_url}
             alt={profile.name}
-            style={{ width: 80, height: 80, borderRadius: "50%", objectFit: "cover", border: "3px solid var(--sage-mist)" }}
+            width={80}
+            height={80}
+            style={{ borderRadius: "50%", objectFit: "cover", border: "3px solid var(--sage-mist)" }}
           />
         ) : (
           <div
@@ -226,10 +229,12 @@ function SelfProfileContent({ profile }: { profile: MemberProfile }) {
     <>
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: 28 }}>
         {profile.avatar_url ? (
-          <img
+          <Image
             src={profile.avatar_url}
             alt={profile.name}
-            style={{ width: 80, height: 80, borderRadius: "50%", objectFit: "cover", border: "3px solid var(--sage-mist)" }}
+            width={80}
+            height={80}
+            style={{ borderRadius: "50%", objectFit: "cover", border: "3px solid var(--sage-mist)" }}
           />
         ) : (
           <div
