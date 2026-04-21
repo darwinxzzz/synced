@@ -236,6 +236,7 @@ export function ReflectionDrawer({ open, onClose }: ReflectionDrawerProps) {
         open={!!detailReflection}
         onClose={() => setDetailReflection(null)}
         onSuccess={handleSuccess}
+        viewerRole="member"
       />
     </>
   );

@@ -230,6 +230,7 @@ export function MemberTestimonialView({
         open={!!openReflection}
         onClose={() => setOpenReflection(null)}
         onSuccess={() => void refetch()}
+        viewerRole={viewerRole === "admin" ? "admin" : "member"}
       />
 
       <style>{`

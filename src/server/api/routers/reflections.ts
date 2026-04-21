@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { createTRPCRouter, protectedProcedure, adminProcedure } from "~/server/api/trpc";
 
 export const reflectionsRouter = createTRPCRouter({
   getMyReflections: protectedProcedure.query(async ({ ctx }) => {
@@ -103,6 +103,39 @@ export const reflectionsRouter = createTRPCRouter({
         .eq("id", reflectionId)
         .eq("user_id", ctx.user.id)
         .eq("status", "pending")
+        .select()
+        .single();
+
+      if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+      return data;
+    }),
+
+  adminUpdateReflection: adminProcedure
+    .input(
+      z.object({
+        reflectionId: z.string().uuid(),
+        currentTask: z.string().min(1).max(200).optional(),
+        description: z.string().max(500).optional(),
+        impact: z.string().max(500).optional(),
+        challenges: z.string().max(500).optional(),
+        personalLearning: z.string().max(500).optional(),
+        orgLearning: z.string().max(500).optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const { reflectionId, ...fields } = input;
+      const payload: Record<string, string> = {};
+      if (fields.currentTask !== undefined) payload.current_task = fields.currentTask;
+      if (fields.description !== undefined) payload.description = fields.description;
+      if (fields.impact !== undefined) payload.impact = fields.impact;
+      if (fields.challenges !== undefined) payload.challenges = fields.challenges;
+      if (fields.personalLearning !== undefined) payload.personal_learning = fields.personalLearning;
+      if (fields.orgLearning !== undefined) payload.org_learning = fields.orgLearning;
+
+      const { data, error } = await ctx.supabase
+        .from("reflections")
+        .update(payload)
+        .eq("id", reflectionId)
         .select()
         .single();
 
