@@ -108,16 +108,25 @@ export function MemberTestimonialView({
         <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "14px", color: "var(--stone-grey)", maxWidth: "480px", margin: "0 auto", lineHeight: 1.7 }}>
           This document represents a verified record of contributions, attendance, and impact within the SYAI community.
         </p>
-         {!isEditing && (
-              <button type="button" className="no-print" onClick={handleEditStart} style={{ display: "flex", alignItems: "center", gap: "6px", height: "34px", padding: "0 14px", borderRadius: "8px", border: "1px solid rgba(74,124,89,0.30)", background: "transparent", color: "var(--bamboo-green)", fontFamily: "'DM Sans', sans-serif", fontWeight: 600, fontSize: "12px", cursor: "pointer", letterSpacing: "0.04em" }}>
-                <svg width="13" height="13" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
-                  <path d="M11.5 2.5a1.414 1.414 0 0 1 2 2L5 13H3v-2L11.5 2.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-                Edit
-              </button>
-            )}
       </div>
-
+    
+      {!isEditing && (
+        <div
+          className="no-print"
+          style={{ display: "flex", justifyContent: "flex-end", marginBottom: "16px" }}
+        >
+          <button
+            type="button"
+            onClick={handleEditStart}
+            style={{ display: "flex", alignItems: "center", gap: "6px", height: "34px", padding: "0 14px", borderRadius: "8px", border: "1px solid rgba(74,124,89,0.30)", background: "transparent", color: "var(--bamboo-green)", fontFamily: "'DM Sans', sans-serif", fontWeight: 600, fontSize: "12px", cursor: "pointer", letterSpacing: "0.04em" }}
+          >
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
+              <path d="M11.5 2.5a1.414 1.414 0 0 1 2 2L5 13H3v-2L11.5 2.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            Edit
+          </button>
+        </div>
+      )}
       {/* Main Card */}
       <div id="testimonial-card" className="card-shadow" style={{ background: "var(--cream-white)", borderRadius: "24px", padding: "clamp(28px, 4vw, 52px)", display: "flex", flexDirection: "column", gap: "56px" }}>
         {/* Profile Row */}
