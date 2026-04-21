@@ -182,6 +182,8 @@ export function MemberTestimonialView({
           <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "14px" }}>
             
             <div style={{ textAlign: "right" }}>
+              <span className="bamboo-label" style={{ display: "block", marginBottom: "14px" }}>
+              </span> 
               <p style={{ fontFamily: "'Playfair Display', serif", fontSize: "22px", fontWeight: 700, color: "var(--deep-forest)", lineHeight: 1.25, margin: 0 }}>
                 Volunteering Performance:<br />{performance.label}
               </p>
