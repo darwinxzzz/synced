@@ -14,7 +14,7 @@ const contributionInput = z.object({
 export const contributionsRouter = createTRPCRouter({
 
   list: protectedProcedure.query(async ({ ctx }) => {
-    const { data, error } = await ctx.supabase
+    const { data, error } = await ctx.supabase //waiting for data cannot do other things
       .from("contributions")
       .select("*")
       .eq("user_id", ctx.user.id)
