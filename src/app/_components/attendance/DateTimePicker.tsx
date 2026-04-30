@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { Calendar, Clock, RefreshCw } from "lucide-react"
 
-export interface DateTimeValue {
+interface DateTimeValue {
   startDate: string
   startTime: string
   endDate?: string

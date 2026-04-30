@@ -36,11 +36,13 @@ export default function AdminTestimonialDetailPage() {
   }, []);
 
   const finalise = api.testimonials.finaliseTestimonial.useMutation({
-    onSuccess: async () => {
+    onSuccess: () => {
       toast.success(`Testimonial sent to ${data?.profile.name ?? "member"}`);
-      await refetch();
     },
     onError: (error) => toast.error(error.message),
+    onSettled: () => {
+      void refetch();
+    },
   });
 
   const seedQuote = useMemo(() => {

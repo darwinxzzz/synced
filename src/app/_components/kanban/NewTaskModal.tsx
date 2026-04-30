@@ -46,6 +46,7 @@ export function NewTaskModal({ open, eventId, onClose, onSuccess }: NewTaskModal
   const [selectedUserName, setSelectedUserName] = useState<string>("");
   const [saving, setSaving] = useState(false);
 
+  const utils = api.useUtils();
   const { data: departments = [] } = api.kanban.getDepartments.useQuery(undefined, { enabled: open });
   const { data: members = [] } = api.kanban.getAdminMembers.useQuery(
     { search: memberSearch },
@@ -59,6 +60,9 @@ export function NewTaskModal({ open, eventId, onClose, onSuccess }: NewTaskModal
       handleClose();
     },
     onError: (err) => toast.error(err.message),
+    onSettled: () => {
+      void utils.kanban.getOpenBoard.invalidate({ eventId });
+    },
   });
 
   const handleClose = () => {

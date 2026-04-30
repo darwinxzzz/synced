@@ -109,18 +109,23 @@ function KanbanBoard() {
       shakeCard(eventMemberId);
       toast.error(err.message);
     },
+    onSettled: (_d, _e, _v, ctx) => {
+      if (ctx?.eventId) void utils.kanban.getMemberKanban.invalidate({ eventId: ctx.eventId });
+    },
   });
 
   const updateContribution = api.kanban.updateOwnContribution.useMutation({
     onMutate: async ({ contributionId, priority }) => {
       const eventId = selectedEventId;
-      if (!eventId || !priority) return { prev: undefined, eventId: null };
+      if (!eventId) return { prev: undefined, eventId: null };
       await utils.kanban.getMemberKanban.cancel({ eventId });
       const prev = utils.kanban.getMemberKanban.getData({ eventId });
-      utils.kanban.getMemberKanban.setData(
-        { eventId },
-        (old) => old ? applyOptimisticContributionUpdate(old, contributionId, { priority }) : old,
-      );
+      if (priority) {
+        utils.kanban.getMemberKanban.setData(
+          { eventId },
+          (old) => old ? applyOptimisticContributionUpdate(old, contributionId, { priority }) : old,
+        );
+      }
       return { prev, eventId };
     },
     onError: (err, _vars, ctx) => {
@@ -128,6 +133,9 @@ function KanbanBoard() {
         utils.kanban.getMemberKanban.setData({ eventId: ctx.eventId }, ctx.prev);
       }
       toast.error(err.message);
+    },
+    onSettled: (_d, _e, _v, ctx) => {
+      if (ctx?.eventId) void utils.kanban.getMemberKanban.invalidate({ eventId: ctx.eventId });
     },
   });
 

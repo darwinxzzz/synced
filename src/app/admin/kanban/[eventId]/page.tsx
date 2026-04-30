@@ -58,6 +58,9 @@ export default function AdminOpenBoardPage() {
       if (ctx?.prev) utils.kanban.getOpenBoard.setData({ eventId }, ctx.prev);
       toast.error(err.message);
     },
+    onSettled: () => {
+      void utils.kanban.getOpenBoard.invalidate({ eventId });
+    },
   });
 
   // Realtime subscription
@@ -496,7 +499,7 @@ export default function AdminOpenBoardPage() {
         open={newTaskOpen}
         eventId={eventId}
         onClose={() => setNewTaskOpen(false)}
-        onSuccess={() => void refetch()}
+        onSuccess={() => setNewTaskOpen(false)}
       />
 
       {/* Close filter dropdown on outside click */}

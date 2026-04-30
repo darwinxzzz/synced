@@ -28,11 +28,25 @@ export default function AdminKanbanPage() {
   const [createEventOpen, setCreateEventOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const { data: rawEvents = [], refetch } = api.kanban.getAdminBirdsEye.useQuery();
+  const { data: rawEvents = [] } = api.kanban.getAdminBirdsEye.useQuery();
+  const utils = api.useUtils();
 
   const moveEvent = api.kanban.moveEvent.useMutation({
-    onSuccess: () => void refetch(),
-    onError: (err) => toast.error(err.message),
+    onMutate: async ({ eventId: evId, kanbanStatus }) => {
+      await utils.kanban.getAdminBirdsEye.cancel();
+      const prev = utils.kanban.getAdminBirdsEye.getData();
+      utils.kanban.getAdminBirdsEye.setData(undefined, (old) =>
+        old?.map((ev) => ev.id === evId ? { ...ev, kanbanStatus } : ev) ?? []
+      );
+      return { prev };
+    },
+    onError: (err, _vars, ctx) => {
+      if (ctx?.prev) utils.kanban.getAdminBirdsEye.setData(undefined, ctx.prev);
+      toast.error(err.message);
+    },
+    onSettled: () => {
+      void utils.kanban.getAdminBirdsEye.invalidate();
+    },
   });
 
   const activeCount = rawEvents.filter((e) => e.status === "active").length;
@@ -367,7 +381,7 @@ export default function AdminKanbanPage() {
         isOpen={createEventOpen}
         onClose={() => setCreateEventOpen(false)}
         onCreated={() => {
-          void refetch();
+          void utils.kanban.getAdminBirdsEye.invalidate();
           toast.success("Kanban updated");
         }}
       />

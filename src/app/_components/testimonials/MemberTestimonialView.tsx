@@ -74,7 +74,7 @@ export function MemberTestimonialView({
       toast.error(err.message);
     },
     onSettled: () => {
-      void refetch();
+      void utils.testimonials.getMemberTestimonial.invalidate({ memberId });
     },
   });
 

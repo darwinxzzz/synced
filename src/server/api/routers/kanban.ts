@@ -264,9 +264,9 @@ export const kanbanRouter = createTRPCRouter({
   getAdminBirdsEye: adminProcedure.query(async ({ ctx }) => {
     const { data: events, error: evtErr } = await ctx.supabase
       .from("events")
-      .select("id, name, date, status, description")
+      .select("id, name, date, status, kanban_status, description")
       .order("date", { ascending: false }) as unknown as {
-        data: Array<{ id: string; name: string; date: string | null; status: string; description: string | null }> | null;
+        data: Array<{ id: string; name: string; date: string | null; status: string; kanban_status: string; description: string | null }> | null;
         error: { message: string } | null;
       };
 
@@ -303,12 +303,6 @@ export const kanbanRouter = createTRPCRouter({
       };
 
     const profileMap = new Map((profiles ?? []).map((p) => [p.id, p]));
-
-    const statusToKanban = (s: string): "new" | "in_progress" | "in_review" | "done" => {
-      if (s === "draft") return "new";
-      if (s === "archived") return "done";
-      return "in_progress";
-    };
 
     const today = new Date();
 
@@ -364,7 +358,7 @@ export const kanbanRouter = createTRPCRouter({
         name: ev.name,
         date: ev.date,
         status: ev.status,
-        kanbanStatus: statusToKanban(ev.status),
+        kanbanStatus: (ev.kanban_status ?? "new") as "new" | "in_progress" | "in_review" | "done",
         description: ev.description,
         globalProgress: counts,
         totalMembers,
@@ -380,18 +374,12 @@ export const kanbanRouter = createTRPCRouter({
   moveEvent: adminProcedure
     .input(z.object({ eventId: z.string().uuid(), kanbanStatus: z.enum(["new", "in_progress", "in_review", "done"]) }))
     .mutation(async ({ ctx, input }) => {
-      const kanbanToStatus: Record<string, string> = {
-        new: "draft",
-        in_progress: "active",
-        in_review: "active",
-        done: "archived",
-      };
-      const { data, error } = await ctx.supabase
+      const { data, error } = await (ctx.supabase
         .from("events")
-        .update({ status: kanbanToStatus[input.kanbanStatus] ?? "draft" })
+        .update({ kanban_status: input.kanbanStatus } as Record<string, unknown>)
         .eq("id", input.eventId)
         .select()
-        .single();
+        .single() as unknown as Promise<{ data: unknown; error: { message: string } | null }>);
       if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
       return data;
     }),
