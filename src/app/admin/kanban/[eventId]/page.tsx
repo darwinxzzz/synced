@@ -7,6 +7,7 @@ import { ArrowLeft, Plus, SlidersHorizontal } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "~/trpc/react";
 import { createClient } from "~/lib/supabase/client";
+import { applyAdminOptimisticMove } from "~/lib/optimistic-updates";
 import { AdminTaskCard, type AdminTask } from "~/app/_components/admin/AdminTaskCard";
 import { TaskDetailDrawer } from "~/app/_components/kanban/TaskDetailDrawer";
 import { NewTaskModal } from "~/app/_components/kanban/NewTaskModal";
@@ -41,10 +42,23 @@ export default function AdminOpenBoardPage() {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const { data, refetch } = api.kanban.getOpenBoard.useQuery({ eventId }, { enabled: !!eventId });
+  const utils = api.useUtils();
 
   const adminMoveTask = api.kanban.adminMoveTask.useMutation({
-    onSuccess: () => void refetch(),
-    onError: (err) => toast.error(err.message),
+    onMutate: async ({ eventMemberId, newStatus }) => {
+      await utils.kanban.getOpenBoard.cancel({ eventId });
+      const prev = utils.kanban.getOpenBoard.getData({ eventId });
+      utils.kanban.getOpenBoard.setData({ eventId }, (old) => {
+        if (!old) return old;
+        return { ...old, tasks: applyAdminOptimisticMove(old.tasks, eventMemberId, newStatus) };
+      });
+      return { prev };
+    },
+    onError: (err, _vars, ctx) => {
+      if (ctx?.prev) utils.kanban.getOpenBoard.setData({ eventId }, ctx.prev);
+      toast.error(err.message);
+    },
+    onSettled: () => void refetch(),
   });
 
   // Realtime subscription

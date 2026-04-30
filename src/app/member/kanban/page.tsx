@@ -7,6 +7,7 @@ import { Bell, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "~/trpc/react";
 import { createClient } from "~/lib/supabase/client";
+import { applyOptimisticMove, applyOptimisticContributionUpdate } from "~/lib/optimistic-updates";
 import { KanbanPillar } from "~/app/_components/kanban/KanbanPillar";
 import { InReviewModal } from "~/app/_components/kanban/InReviewModal";
 import { TaskDetailDrawer } from "~/app/_components/kanban/TaskDetailDrawer";
@@ -72,6 +73,8 @@ function KanbanBoard() {
 
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  const utils = api.useUtils();
+
   // Queries
   const { data: events = [] } = api.kanban.getMyEvents.useQuery();
   const { data: tasks = [], refetch: refetchTasks } = api.kanban.getMemberKanban.useQuery(
@@ -82,13 +85,48 @@ function KanbanBoard() {
     api.kanban.getPendingReflectionCount.useQuery();
   const { data: profile } = api.dashboard.getMyProfile.useQuery();
 
-  // Mutations
+  // Mutations with optimistic updates
   const moveTask = api.kanban.moveTask.useMutation({
-    onSuccess: () => void refetchTasks(),
-    onError: (err) => toast.error(err.message),
+    onMutate: async ({ eventMemberId, newStatus }) => {
+      const eventId = selectedEventId;
+      if (!eventId) return { prev: undefined, eventId: null };
+      await utils.kanban.getMemberKanban.cancel({ eventId });
+      const prev = utils.kanban.getMemberKanban.getData({ eventId });
+      utils.kanban.getMemberKanban.setData(
+        { eventId },
+        (old) => old ? applyOptimisticMove(old, eventMemberId, newStatus) : old,
+      );
+      return { prev, eventId };
+    },
+    onError: (err, { eventMemberId }, ctx) => {
+      if (ctx?.eventId && ctx.prev !== undefined) {
+        utils.kanban.getMemberKanban.setData({ eventId: ctx.eventId }, ctx.prev);
+      }
+      shakeCard(eventMemberId);
+      toast.error(err.message);
+    },
+    onSettled: () => void refetchTasks(),
   });
+
   const updateContribution = api.kanban.updateOwnContribution.useMutation({
-    onSuccess: () => void refetchTasks(),
+    onMutate: async ({ contributionId, priority }) => {
+      const eventId = selectedEventId;
+      if (!eventId || !priority) return { prev: undefined, eventId: null };
+      await utils.kanban.getMemberKanban.cancel({ eventId });
+      const prev = utils.kanban.getMemberKanban.getData({ eventId });
+      utils.kanban.getMemberKanban.setData(
+        { eventId },
+        (old) => old ? applyOptimisticContributionUpdate(old, contributionId, { priority }) : old,
+      );
+      return { prev, eventId };
+    },
+    onError: (err, _vars, ctx) => {
+      if (ctx?.eventId && ctx.prev !== undefined) {
+        utils.kanban.getMemberKanban.setData({ eventId: ctx.eventId }, ctx.prev);
+      }
+      toast.error(err.message);
+    },
+    onSettled: () => void refetchTasks(),
   });
 
   // Auto-select first event
@@ -106,8 +144,6 @@ function KanbanBoard() {
       return () => clearTimeout(t);
     }
   }, [highlightTaskId]);
-
-  const utils = api.useUtils();
 
   // Supabase Realtime — kanban updates
   useEffect(() => {

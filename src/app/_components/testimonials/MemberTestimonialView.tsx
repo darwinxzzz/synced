@@ -48,17 +48,34 @@ export function MemberTestimonialView({
   const [editName, setEditName] = useState("");
   const [editDepartment, setEditDepartment] = useState("");
 
+  const utils = api.useUtils();
   const { data, isLoading, refetch } = api.testimonials.getMemberTestimonial.useQuery(
     { memberId },
     { retry: false }
   );
 
   const requestMutation = api.testimonials.requestTestimonial.useMutation({
+    onMutate: async () => {
+      await utils.testimonials.getMemberTestimonial.cancel({ memberId });
+      const prev = utils.testimonials.getMemberTestimonial.getData({ memberId });
+      utils.testimonials.getMemberTestimonial.setData({ memberId }, (old) => {
+        if (!old) return old;
+        return { ...old, hasRequestedTestimonial: true };
+      });
+      return { prev };
+    },
     onSuccess: () => {
       toast.success("Testimonial requested ✨");
+    },
+    onError: (err, _vars, ctx) => {
+      if (ctx?.prev) {
+        utils.testimonials.getMemberTestimonial.setData({ memberId }, ctx.prev);
+      }
+      toast.error(err.message);
+    },
+    onSettled: () => {
       void refetch();
     },
-    onError: (err) => toast.error(err.message),
   });
 
   if (isLoading) {
@@ -182,8 +199,6 @@ export function MemberTestimonialView({
           <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "14px" }}>
             
             <div style={{ textAlign: "right" }}>
-              <span className="bamboo-label" style={{ display: "block", marginBottom: "14px" }}>
-              </span> 
               <p style={{ fontFamily: "'Playfair Display', serif", fontSize: "22px", fontWeight: 700, color: "var(--deep-forest)", lineHeight: 1.25, margin: 0 }}>
                 Volunteering Performance:<br />{performance.label}
               </p>
