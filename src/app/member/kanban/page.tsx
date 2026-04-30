@@ -79,7 +79,11 @@ function KanbanBoard() {
   const { data: events = [] } = api.kanban.getMyEvents.useQuery();
   const { data: tasks = [], refetch: refetchTasks } = api.kanban.getMemberKanban.useQuery(
     { eventId: selectedEventId ?? "" },
-    { enabled: !!selectedEventId }
+    { enabled: !!selectedEventId, staleTime: 30_000 }
+  );
+  const { data: hasContribution } = api.kanban.checkContributionExists.useQuery(
+    { eventId: selectedEventId ?? "" },
+    { enabled: !!selectedEventId, staleTime: 30_000 }
   );
   const { data: reflectionCount = 0, refetch: refetchReflections } =
     api.kanban.getPendingReflectionCount.useQuery();
@@ -105,7 +109,6 @@ function KanbanBoard() {
       shakeCard(eventMemberId);
       toast.error(err.message);
     },
-    onSettled: () => void refetchTasks(),
   });
 
   const updateContribution = api.kanban.updateOwnContribution.useMutation({
@@ -126,7 +129,6 @@ function KanbanBoard() {
       }
       toast.error(err.message);
     },
-    onSettled: () => void refetchTasks(),
   });
 
   // Auto-select first event
@@ -217,31 +219,20 @@ function KanbanBoard() {
       const validTarget = targetStatus as "in_progress" | "in_review";
 
       if (validTarget === "in_review") {
-        // Must check contribution exists first
-        void (async () => {
-          try {
-            const exists = await utils.kanban.checkContributionExists.fetch({
-              eventId: selectedEventId ?? "",
-            });
-            if (!exists) {
-              shakeCard(taskId);
-              toast("Please add a contribution before moving to In Review");
-              return;
-            }
-            // Open in-review modal
-            setPendingMoveTaskId(taskId);
-            setInReviewOpen(true);
-          } catch {
-            toast.error("Could not verify contribution. Please try again.");
-          }
-        })();
+        if (!hasContribution) {
+          shakeCard(taskId);
+          toast("Please add a contribution before moving to In Review");
+          return;
+        }
+        setPendingMoveTaskId(taskId);
+        setInReviewOpen(true);
         return;
       }
 
       // Direct move (new → in_progress)
       moveTask.mutate({ eventMemberId: taskId, newStatus: validTarget });
     },
-    [tasks, selectedEventId, utils, moveTask]
+    [tasks, hasContribution, moveTask]
   );
 
   const handleInReviewConfirm = (changes: string, challengesFaced: string) => {

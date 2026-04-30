@@ -41,7 +41,7 @@ export default function AdminOpenBoardPage() {
   const [filters, setFilters] = useState<FilterState>({ department: "", search: "" });
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const { data, refetch } = api.kanban.getOpenBoard.useQuery({ eventId }, { enabled: !!eventId });
+  const { data, refetch } = api.kanban.getOpenBoard.useQuery({ eventId }, { enabled: !!eventId, staleTime: 30_000 });
   const utils = api.useUtils();
 
   const adminMoveTask = api.kanban.adminMoveTask.useMutation({
@@ -58,7 +58,6 @@ export default function AdminOpenBoardPage() {
       if (ctx?.prev) utils.kanban.getOpenBoard.setData({ eventId }, ctx.prev);
       toast.error(err.message);
     },
-    onSettled: () => void refetch(),
   });
 
   // Realtime subscription

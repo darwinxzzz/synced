@@ -400,25 +400,21 @@ export const kanbanRouter = createTRPCRouter({
   getOpenBoard: adminProcedure
     .input(z.object({ eventId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
-      const { data: event, error: evtErr } = await ctx.supabase
-        .from("events")
-        .select("id, name, date, status, description")
-        .eq("id", input.eventId)
-        .single() as unknown as {
-          data: { id: string; name: string; date: string | null; status: string; description: string | null } | null;
-          error: { message: string } | null;
-        };
+      const [eventResult, membersResult] = await Promise.all([
+        ctx.supabase.from("events").select("id, name, date, status, description").eq("id", input.eventId).single(),
+        ctx.supabase.from("event_members").select("id, task, department, pillar_status, user_id").eq("event_id", input.eventId),
+      ]);
+
+      const { data: event, error: evtErr } = eventResult as unknown as {
+        data: { id: string; name: string; date: string | null; status: string; description: string | null } | null;
+        error: { message: string } | null;
+      };
+      const { data: members, error: memErr } = membersResult as unknown as {
+        data: Array<{ id: string; task: string | null; department: string | null; pillar_status: string; user_id: string }> | null;
+        error: { message: string } | null;
+      };
 
       if (evtErr ?? !event) throw new TRPCError({ code: "NOT_FOUND", message: "Event not found" });
-
-      const { data: members, error: memErr } = await ctx.supabase
-        .from("event_members")
-        .select("id, task, department, pillar_status, user_id")
-        .eq("event_id", input.eventId) as unknown as {
-          data: Array<{ id: string; task: string | null; department: string | null; pillar_status: string; user_id: string }> | null;
-          error: { message: string } | null;
-        };
-
       if (memErr) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: memErr.message });
 
       const userIds = [...new Set((members ?? []).map((m) => m.user_id))];
