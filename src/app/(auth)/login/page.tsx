@@ -13,9 +13,9 @@ import { MfaEnrollPanel } from "./_components/MfaEnrollPanel"
 import { MfaModal } from "./_components/MfaModal"
 import { SignupForm } from "./_components/SignupForm"
 
-type AuthView = "login" | "signup" | "enroll"
+type AuthView = "login" | "signup" | "enroll" | "recovery"
 
-const DEPARTMENT_FALLBACK = ["Software", "Operations", "Design", "Publicity", "Partnerships"]
+const DEPARTMENT_FALLBACK = ["Software", "Monthly Meet-Up", "Inspire", "Publicity", "Connectors"]
 
 export default function LoginPage() {
   return (
@@ -62,6 +62,9 @@ function AuthSurface() {
   const [enrollFactorId, setEnrollFactorId] = useState("")
   const [enrollCode, setEnrollCode] = useState("")
   const [showSecret, setShowSecret] = useState(false)
+  const [recoveryPassword, setRecoveryPassword] = useState("")
+  const [recoveryConfirmPassword, setRecoveryConfirmPassword] = useState("")
+  const [recoveryReady, setRecoveryReady] = useState(false)
 
   const formVariants = useMemo(
     () => ({
@@ -94,6 +97,68 @@ function AuthSurface() {
   }, [])
 
   useEffect(() => {
+    const mode = searchParams.get("mode")
+    if (mode !== "recovery") return
+
+    let active = true
+
+    const prepareRecovery = async () => {
+      setLoading(true)
+      const supabase = createClient()
+      const code = searchParams.get("code")
+
+      if (code) {
+        const { error } = await supabase.auth.exchangeCodeForSession(code)
+        if (error) {
+          toast.error("That password reset link is invalid or expired.")
+          if (active) {
+            setLoading(false)
+            setRecoveryReady(false)
+            setView("login")
+          }
+          router.replace("/login")
+          return
+        }
+      }
+
+      const hashParams = typeof window === "undefined"
+        ? new URLSearchParams()
+        : new URLSearchParams(window.location.hash.replace(/^#/, ""))
+      const recoveryType = searchParams.get("type") ?? hashParams.get("type")
+      const hasRecoveryToken = Boolean(code ?? hashParams.get("access_token"))
+      const { data } = await supabase.auth.getSession()
+
+      if (!hasRecoveryToken && recoveryType !== "recovery" && !data.session) {
+        toast.error("That password reset link is invalid or expired.")
+        if (active) {
+          setLoading(false)
+          setRecoveryReady(false)
+          setView("login")
+        }
+        router.replace("/login")
+        return
+      }
+
+      if (!active) return
+
+      setRecoveryPassword("")
+      setRecoveryConfirmPassword("")
+      setRecoveryReady(true)
+      setView("recovery")
+      setLoading(false)
+      if (typeof window !== "undefined") {
+        window.history.replaceState({}, document.title, `${window.location.pathname}?mode=recovery`)
+      }
+    }
+
+    void prepareRecovery()
+
+    return () => {
+      active = false
+    }
+  }, [router, searchParams])
+
+  useEffect(() => {
     if (view !== "signup") return
     const loadDepartments = async () => {
       try {
@@ -111,8 +176,8 @@ function AuthSurface() {
   async function redirectAfterLogin(supabase: ReturnType<typeof createClient>, userId: string) {
     const { data: profile } = await supabase.from("profiles").select("role, status").eq("id", userId).single()
     if (!profile) { await supabase.auth.signOut(); toast.error("You have not been added to Event Sync. Contact your admin."); return }
-    if (profile.status === "pending") { await supabase.auth.signOut(); toast.error("Your account is pending admin approval"); return }
-    if (profile.status === "rejected" || profile.status === "inactive") { await supabase.auth.signOut(); toast.error("Your account has not been approved. Contact an admin."); return }
+    //if (profile.status === "pending") { await supabase.auth.signOut(); toast.error("Your account is pending admin approval"); return }
+    if (profile.status === "rejected" || profile.status === "inactive"|| profile.status === "pending") { await supabase.auth.signOut(); toast.error("Your account has not been approved."); return }
     if (profile.status !== "active") { await supabase.auth.signOut(); toast.error("Your account is pending admin approval"); return }
     router.push(profile.role === "admin" ? "/admin/dashboard" : "/member/dashboard")
   }
@@ -171,14 +236,37 @@ function AuthSurface() {
     if (oauthError) { toast.error(oauthError.message); setLoading(false) }
   }
 
-  async function handleForgotPassword() {
+  async function handleForgotPassword() { 
     if (!loginEmail) { toast.error("Enter your email address first."); return }
     setLoading(true)
     const supabase = createClient()
-    const { error } = await supabase.auth.resetPasswordForEmail(loginEmail, { redirectTo: `${window.location.origin}/login` })
+    const { error } = await supabase.auth.resetPasswordForEmail(loginEmail, {
+      redirectTo: `${window.location.origin}/login?mode=recovery`,
+    })
     if (error) { toast.error(error.message); setLoading(false); return }
     toast.success("Password reset email sent. Check your inbox.")
     setLoading(false)
+  }
+
+  async function handlePasswordRecovery(e: React.FormEvent) {
+    e.preventDefault()
+    if (!recoveryReady) { toast.error("Open the password reset link from your email to continue."); return }
+    if (recoveryPassword !== recoveryConfirmPassword) { toast.error("Passwords do not match."); return }
+    if (recoveryPassword.length < 8) { toast.error("Password must be at least 8 characters."); return }
+
+    setLoading(true)
+    const supabase = createClient()
+    const { error } = await supabase.auth.updateUser({ password: recoveryPassword })
+    if (error) { toast.error(error.message); setLoading(false); return }
+
+    await supabase.auth.signOut()
+    toast.success("Password updated. Sign in with your new password.")
+    setRecoveryPassword("")
+    setRecoveryConfirmPassword("")
+    setRecoveryReady(false)
+    setView("login")
+    setLoading(false)
+    router.replace("/login")
   }
 
   function toggleTool(tool: string) {
@@ -237,9 +325,9 @@ function AuthSurface() {
 
       <section className="relative z-10 mx-auto flex h-screen w-full max-w-[1600px] items-center overflow-hidden px-4 py-6 lg:px-10 lg:py-10">
         <AnimatePresence mode="wait" initial={false}>
-          {view === "login" && (
+          {(view === "login" || view === "recovery") && (
             <motion.div
-              key="login-shell"
+              key={view === "recovery" ? "recovery-shell" : "login-shell"}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
@@ -247,97 +335,172 @@ function AuthSurface() {
               className="ml-auto w-full max-w-md"
             >
               <div className="rounded-3xl border border-white/20 bg-[#fffdf8]/93 p-8 shadow-[0_26px_80px_-20px_rgba(20,30,24,0.55)] backdrop-blur-md md:p-10">
-                <h2 className="font-headline text-3xl italic text-[#052417]">Welcome Back</h2>
-                <p className="mt-2 text-sm text-[#4e544f]">Sign in to your workspace.</p>
+                <h2 className="font-headline text-3xl italic text-[#052417]">
+                  {view === "recovery" ? "Reset Password" : "Welcome Back"}
+                </h2>
+                <p className="mt-2 text-sm text-[#4e544f]">
+                  {view === "recovery"
+                    ? "Choose a new password for your workspace."
+                    : "Sign in to your workspace."}
+                </p>
 
                 <motion.form
-                  onSubmit={handleSignIn}
+                  onSubmit={view === "recovery" ? handlePasswordRecovery : handleSignIn}
                   className="mt-8 space-y-5"
                   variants={formVariants}
                   initial="hidden"
                   animate="visible"
                 >
-                  <motion.div variants={fieldVariants}>
-                    <FieldLabel htmlFor="login-email">Email Address</FieldLabel>
-                    <InputWrapper isFocused={focusedField === "login-email"}>
-                      <Input
-                        id="login-email"
-                        type="email"
-                        value={loginEmail}
-                        onChange={(e) => setLoginEmail(e.target.value)}
-                        onFocus={() => setFocusedField("login-email")}
-                        onBlur={() => setFocusedField(null)}
-                        required
-                        placeholder="name@eventsync.com"
-                        className="h-14 rounded-full border-0 bg-[#ddd8d0] px-6 text-[#1d1c17] shadow-none placeholder:text-[#a9afaa] focus-visible:ring-0"
-                      />
-                    </InputWrapper>
-                  </motion.div>
+                  {view === "recovery" ? (
+                    <>
+                      <motion.div variants={fieldVariants}>
+                        <FieldLabel htmlFor="recovery-password">New Password</FieldLabel>
+                        <InputWrapper isFocused={focusedField === "recovery-password"}>
+                          <Input
+                            id="recovery-password"
+                            type="password"
+                            value={recoveryPassword}
+                            onChange={(e) => setRecoveryPassword(e.target.value)}
+                            onFocus={() => setFocusedField("recovery-password")}
+                            onBlur={() => setFocusedField(null)}
+                            required
+                            placeholder="Minimum 8 characters"
+                            className="h-14 rounded-full border-0 bg-[#ddd8d0] px-6 text-[#1d1c17] shadow-none placeholder:text-[#a9afaa] focus-visible:ring-0"
+                          />
+                        </InputWrapper>
+                      </motion.div>
 
-                  <motion.div variants={fieldVariants}>
-                    <div className="mb-2 flex items-center justify-between px-1">
-                      <FieldLabel htmlFor="login-password" className="mb-0 px-0">Password</FieldLabel>
-                      <button
-                        type="button"
-                        className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9aa59b] hover:text-[#4b6546]"
-                        onClick={handleForgotPassword}
-                      >
-                        Forgot?
-                      </button>
-                    </div>
-                    <InputWrapper isFocused={focusedField === "login-password"}>
-                      <Input
-                        id="login-password"
-                        type="password"
-                        value={loginPassword}
-                        onChange={(e) => setLoginPassword(e.target.value)}
-                        onFocus={() => setFocusedField("login-password")}
-                        onBlur={() => setFocusedField(null)}
-                        required
-                        placeholder="********"
-                        className="h-14 rounded-full border-0 bg-[#ddd8d0] px-6 text-[#1d1c17] shadow-none placeholder:text-[#a9afaa] focus-visible:ring-0"
-                      />
-                    </InputWrapper>
-                  </motion.div>
+                      <motion.div variants={fieldVariants}>
+                        <FieldLabel htmlFor="recovery-confirm-password">Confirm New Password</FieldLabel>
+                        <InputWrapper isFocused={focusedField === "recovery-confirm-password"}>
+                          <Input
+                            id="recovery-confirm-password"
+                            type="password"
+                            value={recoveryConfirmPassword}
+                            onChange={(e) => setRecoveryConfirmPassword(e.target.value)}
+                            onFocus={() => setFocusedField("recovery-confirm-password")}
+                            onBlur={() => setFocusedField(null)}
+                            required
+                            placeholder="Re-enter your password"
+                            className="h-14 rounded-full border-0 bg-[#ddd8d0] px-6 text-[#1d1c17] shadow-none placeholder:text-[#a9afaa] focus-visible:ring-0"
+                          />
+                        </InputWrapper>
+                      </motion.div>
 
-                  <motion.div variants={fieldVariants} className="space-y-4 pt-3">
-                    <HoverTapButton
-                      type="submit"
-                      disabled={loading}
-                      className="h-14 w-full rounded-full bg-[linear-gradient(135deg,#1C3A2B_0%,#4A7C59_100%)] text-lg text-white shadow-[0_12px_28px_-14px_rgba(28,58,43,0.9)] hover:opacity-95"
-                    >
-                      {loading ? "Signing In..." : "Verify"}
-                    </HoverTapButton>
+                      <motion.div variants={fieldVariants} className="space-y-4 pt-3">
+                        <HoverTapButton
+                          type="submit"
+                          disabled={loading || !recoveryReady}
+                          className="h-14 w-full rounded-full bg-[linear-gradient(135deg,#1C3A2B_0%,#4A7C59_100%)] text-lg text-white shadow-[0_12px_28px_-14px_rgba(28,58,43,0.9)] hover:opacity-95"
+                        >
+                          {loading ? "Updating Password..." : "Save New Password"}
+                        </HoverTapButton>
+                      </motion.div>
+                    </>
+                  ) : (
+                    <>
+                      <motion.div variants={fieldVariants}>
+                        <FieldLabel htmlFor="login-email">Email Address</FieldLabel>
+                        <InputWrapper isFocused={focusedField === "login-email"}>
+                          <Input
+                            id="login-email"
+                            type="email"
+                            value={loginEmail}
+                            onChange={(e) => setLoginEmail(e.target.value)}
+                            onFocus={() => setFocusedField("login-email")}
+                            onBlur={() => setFocusedField(null)}
+                            required
+                            placeholder="name@eventsync.com"
+                            className="h-14 rounded-full border-0 bg-[#ddd8d0] px-6 text-[#1d1c17] shadow-none placeholder:text-[#a9afaa] focus-visible:ring-0"
+                          />
+                        </InputWrapper>
+                      </motion.div>
 
-                    <div className="flex items-center gap-4 px-1">
-                      <span className="h-px flex-1 bg-[#d9d5cc]" />
-                      <span className="text-sm tracking-[0.14em] text-[#b8b3aa]">OR</span>
-                      <span className="h-px flex-1 bg-[#d9d5cc]" />
-                    </div>
+                      <motion.div variants={fieldVariants}>
+                        <div className="mb-2 flex items-center justify-between px-1">
+                          <FieldLabel htmlFor="login-password" className="mb-0 px-0">Password</FieldLabel>
+                          <button
+                            type="button"
+                            className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9aa59b] hover:text-[#4b6546]"
+                            onClick={handleForgotPassword}
+                          >
+                            Forgot?
+                          </button>
+                        </div>
+                        <InputWrapper isFocused={focusedField === "login-password"}>
+                          <Input
+                            id="login-password"
+                            type="password"
+                            value={loginPassword}
+                            onChange={(e) => setLoginPassword(e.target.value)}
+                            onFocus={() => setFocusedField("login-password")}
+                            onBlur={() => setFocusedField(null)}
+                            required
+                            placeholder="********"
+                            className="h-14 rounded-full border-0 bg-[#ddd8d0] px-6 text-[#1d1c17] shadow-none placeholder:text-[#a9afaa] focus-visible:ring-0"
+                          />
+                        </InputWrapper>
+                      </motion.div>
 
-                    <HoverTapButton
-                      type="button"
-                      disabled={loading}
-                      variant="outline"
-                      className="h-14 w-full rounded-full border-0 bg-[#ddd8d0] text-lg text-[#2d2d2d] hover:bg-[#d5d0c8]"
-                      onClick={handleGoogleVerify}
-                    >
-                      <GoogleIcon />
-                      Sign in with Google
-                    </HoverTapButton>
-                  </motion.div>
+                      <motion.div variants={fieldVariants} className="space-y-4 pt-3">
+                        <HoverTapButton
+                          type="submit"
+                          disabled={loading}
+                          className="h-14 w-full rounded-full bg-[linear-gradient(135deg,#1C3A2B_0%,#4A7C59_100%)] text-lg text-white shadow-[0_12px_28px_-14px_rgba(28,58,43,0.9)] hover:opacity-95"
+                        >
+                          {loading ? "Signing In..." : "Verify"}
+                        </HoverTapButton>
+
+                        <div className="flex items-center gap-4 px-1">
+                          <span className="h-px flex-1 bg-[#d9d5cc]" />
+                          <span className="text-sm tracking-[0.14em] text-[#b8b3aa]">OR</span>
+                          <span className="h-px flex-1 bg-[#d9d5cc]" />
+                        </div>
+
+                        <HoverTapButton
+                          type="button"
+                          disabled={loading}
+                          variant="outline"
+                          className="h-14 w-full rounded-full border-0 bg-[#ddd8d0] text-lg text-[#2d2d2d] hover:bg-[#d5d0c8]"
+                          onClick={handleGoogleVerify}
+                        >
+                          <GoogleIcon />
+                          Sign in with Google
+                        </HoverTapButton>
+                      </motion.div>
+                    </>
+                  )}
                 </motion.form>
 
-                <div className="mt-7 text-center text-sm text-[#4e544f]">
-                  New here?{" "}
-                  <button
-                    type="button"
-                    className="font-semibold text-[#2f4d3d] underline underline-offset-4"
-                    onClick={() => setView("signup")}
-                  >
-                    Create Account
-                  </button>
-                </div>
+                {view === "recovery" ? (
+                  <div className="mt-7 text-center text-sm text-[#4e544f]">
+                    Remembered it?{" "}
+                    <button
+                      type="button"
+                      className="font-semibold text-[#2f4d3d] underline underline-offset-4"
+                      onClick={() => {
+                        setRecoveryReady(false)
+                        setRecoveryPassword("")
+                        setRecoveryConfirmPassword("")
+                        router.replace("/login")
+                        setView("login")
+                      }}
+                    >
+                      Return to sign in
+                    </button>
+                  </div>
+                ) : (
+                  <div className="mt-7 text-center text-sm text-[#4e544f]">
+                    New here?{" "}
+                    <button
+                      type="button"
+                      className="font-semibold text-[#2f4d3d] underline underline-offset-4"
+                      onClick={() => setView("signup")}
+                    >
+                      Create Account
+                    </button>
+                  </div>
+                )}
 
                 <div className="mt-6 border-t border-[#d8d4cb] pt-5 text-center">
                   <p className="text-xs text-[#656d66]">

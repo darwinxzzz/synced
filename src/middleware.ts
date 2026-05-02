@@ -31,6 +31,12 @@ export async function middleware(request: NextRequest) {
     return new NextResponse('Too many requests', { status: 429 })
   }
 
+  // tRPC handles auth/role checks in createTRPCContext + procedures.
+  // Keep middleware rate limiting for /api/trpc, but skip duplicate auth fetch here.
+  if (trpcRoute) {
+    return NextResponse.next({ request })
+  }
+
   // Supabase session refresh
   let supabaseResponse = NextResponse.next({ request })
 
@@ -69,7 +75,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // Auth guards
-  if (!user && onProtectedAppRoute) {
+  if (!user && onProtectedAppRoute) {    //using middleware function through next.js cause referring to supabase to authenticate whether admin
     return redirectToLogin()
   }
 

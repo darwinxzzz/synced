@@ -2,19 +2,25 @@ import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import { ZodError } from "zod";
 import { createClient } from "~/lib/supabase/server";
-
+ 
 export const createTRPCContext = async (opts: { headers: Headers }) => {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
+  // Fetch profile once here — procedures read ctx.profile instead of re-querying
+  const profile = user
+    ? (await supabase.from("profiles").select("role, status").eq("id", user.id).single()).data
+    : null;
+
   return {
     supabase,
     user,
+    profile,
     ...opts,
   };
 };
 
-const t = initTRPC.context<typeof createTRPCContext>().create({
+const t = initTRPC.context<typeof createTRPCContext>().create({  //TRPC is not middlewar.
   transformer: superjson,
   errorFormatter({ shape, error }) {
     return {
@@ -54,19 +60,11 @@ export const publicProcedure = t.procedure.use(timingMiddleware);
 export const protectedProcedure = t.procedure
   .use(timingMiddleware)
   .use(async ({ ctx, next }) => {
-    if (!ctx.user) {
+    if (!ctx.user || !ctx.profile) {
       throw new TRPCError({ code: "UNAUTHORIZED" });
     }
 
-    const { data: profile, error } = await ctx.supabase
-      .from("profiles")
-      .select("status")
-      .eq("id", ctx.user.id)
-      .single();
-
-    if (error || !profile) {
-      throw new TRPCError({ code: "UNAUTHORIZED", message: "PROFILE_NOT_FOUND" });
-    }
+    const { profile } = ctx;
 
     if (profile.status === "pending") {
       throw new TRPCError({ code: "FORBIDDEN", message: "ACCOUNT_PENDING_APPROVAL" });
@@ -91,19 +89,11 @@ export const protectedProcedure = t.procedure
 export const adminProcedure = t.procedure
   .use(timingMiddleware)
   .use(async ({ ctx, next }) => {
-    if (!ctx.user) {
+    if (!ctx.user || !ctx.profile) {
       throw new TRPCError({ code: "UNAUTHORIZED" });
     }
 
-    const { data: profile, error } = await ctx.supabase
-      .from("profiles")
-      .select("status, role")
-      .eq("id", ctx.user.id)
-      .single();
-
-    if (error || !profile) {
-      throw new TRPCError({ code: "UNAUTHORIZED", message: "PROFILE_NOT_FOUND" });
-    }
+    const { profile } = ctx;
 
     if (profile.status !== "active") {
       throw new TRPCError({ code: "FORBIDDEN", message: "ACCOUNT_NOT_ACTIVE" });

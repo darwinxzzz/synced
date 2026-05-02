@@ -1,31 +1,14 @@
 import { NextResponse } from "next/server";
 
-import { createAdminClient } from "~/lib/supabase/admin";
 import { createClient } from "~/lib/supabase/server";
 
+// Public endpoint — used by the signup form before the user is authenticated.
+// No auth check needed; department names are not sensitive data.
 export async function GET() {
   try {
+    // Intentionally avoid service-role on public endpoints.
     const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ departments: [] }, { status: 401 });
-    }
-
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("role, status")
-      .eq("id", user.id)
-      .single();
-
-    if (profile?.role !== "admin" || profile.status !== "active") {
-      return NextResponse.json({ departments: [] }, { status: 403 });
-    }
-
-    const adminSupabase = createAdminClient();
-    const { data, error } = await adminSupabase
+    const { data, error } = await supabase
       .from("profiles")
       .select("department")
       .not("department", "is", null);
@@ -34,11 +17,9 @@ export async function GET() {
       return NextResponse.json({ departments: [] }, { status: 200 });
     }
 
-    const rows = (data ?? []) as Array<{ department: string | null }>;
-
     const departments = Array.from(
       new Set(
-        rows
+        (data ?? [])
           .map((row) => row.department?.trim())
           .filter((value): value is string => Boolean(value)),
       ),

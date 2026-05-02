@@ -26,7 +26,10 @@
       "Read(//c/Users/User/.claude/skills/learned//**)",
       "Read(//c/Users/User/.claude/skills/continuous-learning//**)",
       "Bash(python3 -c ' *)",
-      "Bash(python3 *)"
+      "Bash(python3 *)",
+      "Bash(xargs grep *)",
+      "Bash(npx knip *)",
+      "Bash(npx ts-prune *)"
     ]
   },
   "enableAllProjectMcpServers": true,

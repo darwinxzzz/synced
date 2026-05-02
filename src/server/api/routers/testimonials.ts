@@ -1,6 +1,6 @@
 import { z } from "zod"
 import { TRPCError } from "@trpc/server"
-import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc"
+import { createTRPCRouter, adminProcedure, protectedProcedure } from "~/server/api/trpc"
 
 export const testimonialsRouter = createTRPCRouter({
 
@@ -9,16 +9,13 @@ export const testimonialsRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const { memberId } = input
 
-      // Verify caller is the member themselves or an admin
-      if (memberId !== ctx.user.id) {
-        const { data: callerProfile } = await ctx.supabase
-          .from("profiles")
-          .select("role")
-          .eq("id", ctx.user.id)
-          .single()
-        if (callerProfile?.role !== "admin") {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" })
-        }
+      if (!ctx.profile) {
+        throw new TRPCError({ code: "UNAUTHORIZED" })
+      }
+
+      // Allow self access, plus admins viewing other members.
+      if (memberId !== ctx.user.id && ctx.profile.role !== "admin") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" })
       }
 
       const { data: profile, error: profileError } = await ctx.supabase
@@ -200,17 +197,7 @@ export const testimonialsRouter = createTRPCRouter({
     return { success: true }
   }),
 
-  getTestimonialRequests: protectedProcedure.query(async ({ ctx }) => {
-    const { data: callerProfile } = await ctx.supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", ctx.user.id)
-      .single()
-
-    if (callerProfile?.role !== "admin") {
-      throw new TRPCError({ code: "FORBIDDEN", message: "Admin only" })
-    }
-
+  getTestimonialRequests: adminProcedure.query(async ({ ctx }) => {
     const { data, error } = await ctx.supabase
       .from("testimonial_requests")
       .select("id, status, requested_at, profiles(id, name, email, avatar_url, department, joined_date)")
@@ -220,7 +207,7 @@ export const testimonialsRouter = createTRPCRouter({
     return data
   }),
 
-  getAdminTestimonialsOverview: protectedProcedure
+  getAdminTestimonialsOverview: adminProcedure
     .input(
       z.object({
         department: z.string().optional(),
@@ -229,16 +216,6 @@ export const testimonialsRouter = createTRPCRouter({
       })
     )
     .query(async ({ ctx, input }) => {
-      const { data: callerProfile } = await ctx.supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", ctx.user.id)
-        .single()
-
-      if (callerProfile?.role !== "admin") {
-        throw new TRPCError({ code: "FORBIDDEN", message: "Admin only" })
-      }
-
       const [totalMembersRes, activeMembersRes, pendingReqRes, departmentsRes, totalReqRes] = await Promise.all([
         ctx.supabase.from("profiles").select("id", { count: "exact", head: true }).eq("role", "member"),
         ctx.supabase.from("profiles").select("id", { count: "exact", head: true }).eq("role", "member").eq("status", "active"),
@@ -433,7 +410,7 @@ export const testimonialsRouter = createTRPCRouter({
       }
     }),
 
-  updateTestimonial: protectedProcedure
+  updateTestimonial: adminProcedure
     .input(
       z.object({
         testimonialId: z.string().uuid(),
@@ -443,16 +420,6 @@ export const testimonialsRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      const { data: callerProfile } = await ctx.supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", ctx.user.id)
-        .single()
-
-      if (callerProfile?.role !== "admin") {
-        throw new TRPCError({ code: "FORBIDDEN", message: "Admin only" })
-      }
-
       const { testimonialId, ...fields } = input
       const updates: Record<string, string> = {}
       if (fields.endorsementQuote !== undefined) updates.endorsement_quote = fields.endorsementQuote
@@ -468,7 +435,7 @@ export const testimonialsRouter = createTRPCRouter({
       return { success: true }
     }),
 
-  finaliseTestimonial: protectedProcedure
+  finaliseTestimonial: adminProcedure
     .input(
       z.object({
         memberId: z.string().uuid(),
@@ -480,12 +447,12 @@ export const testimonialsRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const { data: adminProfile } = await ctx.supabase
         .from("profiles")
-        .select("role, name, department")
+        .select("name, department")
         .eq("id", ctx.user.id)
         .single()
 
-      if (adminProfile?.role !== "admin") {
-        throw new TRPCError({ code: "FORBIDDEN", message: "Admin only" })
+      if (!adminProfile) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Admin profile not found" })
       }
 
       const { data: existing } = await ctx.supabase
