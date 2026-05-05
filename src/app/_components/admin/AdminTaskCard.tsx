@@ -1,6 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import Image from "next/image";
+import { Pencil } from "lucide-react";
 
 export interface AdminTask {
   id: string;
@@ -10,11 +12,16 @@ export interface AdminTask {
   assigneeId: string;
   assigneeName: string;
   assigneeAvatar: string | null;
+  description: string | null;
+  outcome: string | null;
+  priority: "low" | "medium" | "high";
+  deadline: string | null;
 }
 
 interface AdminTaskCardProps {
   task: AdminTask;
   onClick: (task: AdminTask) => void;
+  onEdit?: (task: AdminTask) => void;
   dragging?: boolean;
 }
 
@@ -57,7 +64,8 @@ function DepartmentBadge({ dept }: { dept: string }) {
   );
 }
 
-export function AdminTaskCard({ task, onClick, dragging }: AdminTaskCardProps) {
+export function AdminTaskCard({ task, onClick, onEdit, dragging }: AdminTaskCardProps) {
+  const [hovered, setHovered] = useState(false);
   const dotColor = STATUS_DOT[task.pillarStatus] ?? "var(--stone-grey)";
   const initials = task.assigneeName
     .split(" ")
@@ -75,8 +83,17 @@ export function AdminTaskCard({ task, onClick, dragging }: AdminTaskCardProps) {
       draggable
       onDragStart={handleDragStart}
       onClick={() => onClick(task)}
+      onMouseEnter={(e) => {
+        setHovered(true);
+        e.currentTarget.style.boxShadow = "0 2px 12px rgba(28,58,43,0.10)";
+      }}
+      onMouseLeave={(e) => {
+        setHovered(false);
+        e.currentTarget.style.boxShadow = "";
+      }}
       className="card-shadow"
       style={{
+        position: "relative",
         background: "var(--cream-white)",
         borderRadius: "12px",
         padding: "13px 14px",
@@ -88,11 +105,39 @@ export function AdminTaskCard({ task, onClick, dragging }: AdminTaskCardProps) {
         flexDirection: "column",
         gap: "10px",
       }}
-      onMouseEnter={(e) => (e.currentTarget.style.boxShadow = "0 2px 12px rgba(28,58,43,0.10)")}
-      onMouseLeave={(e) => (e.currentTarget.style.boxShadow = "")}
     >
       {/* Dept badge */}
       <DepartmentBadge dept={task.department || "General"} />
+
+      {/* Hover-reveal edit button */}
+      {onEdit && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onEdit(task); }}
+          style={{
+            position: "absolute",
+            top: "10px",
+            right: "10px",
+            width: "28px",
+            height: "28px",
+            borderRadius: "8px",
+            border: "1px solid rgba(74,124,89,0.20)",
+            background: "var(--ivory-paper)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: "pointer",
+            opacity: hovered ? 1 : 0,
+            transform: hovered ? "scale(1)" : "scale(0.85)",
+            transition: "opacity 0.15s, transform 0.15s",
+            zIndex: 1,
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(74,124,89,0.10)")}
+          onMouseLeave={(e) => (e.currentTarget.style.background = "var(--ivory-paper)")}
+          title="Edit task"
+        >
+          <Pencil size={13} color="var(--bamboo-green)" />
+        </button>
+      )}
 
       {/* Task name */}
       <p
@@ -169,6 +214,15 @@ export function AdminTaskCard({ task, onClick, dragging }: AdminTaskCardProps) {
           }}
         />
       </div>
+
+      {/* Deadline chip */}
+      {task.deadline && (
+        <div style={{ display: "flex", alignItems: "center", gap: "5px", marginTop: "2px" }}>
+          <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "10px", color: "var(--stone-grey)" }}>
+            Due: {new Date(task.deadline).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+          </span>
+        </div>
+      )}
     </div>
   );
 }

@@ -258,49 +258,53 @@ export function TaskDetailDrawer({ open, task, onClose, onSave }: TaskDetailDraw
             )}
           </div>
 
-          <div>
-            <label style={isLocked ? readonlyLabelStyle : labelStyle}>Changes Made</label>
-            {isLocked ? (
-              <textarea style={readonlyTextareaStyle} readOnly value={changes} rows={3} />
-            ) : (
-              <>
-                <textarea
-                  style={textareaStyle}
-                  placeholder="30 words max…"
-                  value={changes}
-                  rows={3}
-                  onChange={(e) => setChanges(e.target.value)}
-                  onFocus={(e) => (e.currentTarget.style.borderColor = "var(--bamboo-green)")}
-                  onBlur={(e) => (e.currentTarget.style.borderColor = "rgba(74,124,89,0.20)")}
-                />
-                <p style={{ fontSize: "11px", color: countWords(changes) > WORD_LIMIT ? "var(--deadline-red)" : "var(--stone-grey)", fontFamily: "'DM Sans'", marginTop: "4px", textAlign: "right" }}>
-                  {countWords(changes)} / {WORD_LIMIT} words
-                </p>
-              </>
-            )}
-          </div>
+          {task.pillarStatus !== "new" && (
+            <>
+              <div>
+                <label style={isLocked ? readonlyLabelStyle : labelStyle}>Changes Made</label>
+                {isLocked ? (
+                  <textarea style={readonlyTextareaStyle} readOnly value={changes} rows={3} />
+                ) : (
+                  <>
+                    <textarea
+                      style={textareaStyle}
+                      placeholder="30 words max…"
+                      value={changes}
+                      rows={3}
+                      onChange={(e) => setChanges(e.target.value)}
+                      onFocus={(e) => (e.currentTarget.style.borderColor = "var(--bamboo-green)")}
+                      onBlur={(e) => (e.currentTarget.style.borderColor = "rgba(74,124,89,0.20)")}
+                    />
+                    <p style={{ fontSize: "11px", color: countWords(changes) > WORD_LIMIT ? "var(--deadline-red)" : "var(--stone-grey)", fontFamily: "'DM Sans'", marginTop: "4px", textAlign: "right" }}>
+                      {countWords(changes)} / {WORD_LIMIT} words
+                    </p>
+                  </>
+                )}
+              </div>
 
-          <div>
-            <label style={isLocked ? readonlyLabelStyle : labelStyle}>Challenges Faced</label>
-            {isLocked ? (
-              <textarea style={readonlyTextareaStyle} readOnly value={challenges} rows={3} />
-            ) : (
-              <>
-                <textarea
-                  style={textareaStyle}
-                  placeholder="30 words max…"
-                  value={challenges}
-                  rows={3}
-                  onChange={(e) => setChallenges(e.target.value)}
-                  onFocus={(e) => (e.currentTarget.style.borderColor = "var(--bamboo-green)")}
-                  onBlur={(e) => (e.currentTarget.style.borderColor = "rgba(74,124,89,0.20)")}
-                />
-                <p style={{ fontSize: "11px", color: countWords(challenges) > WORD_LIMIT ? "var(--deadline-red)" : "var(--stone-grey)", fontFamily: "'DM Sans'", marginTop: "4px", textAlign: "right" }}>
-                  {countWords(challenges)} / {WORD_LIMIT} words
-                </p>
-              </>
-            )}
-          </div>
+              <div>
+                <label style={isLocked ? readonlyLabelStyle : labelStyle}>Challenges Faced</label>
+                {isLocked ? (
+                  <textarea style={readonlyTextareaStyle} readOnly value={challenges} rows={3} />
+                ) : (
+                  <>
+                    <textarea
+                      style={textareaStyle}
+                      placeholder="30 words max…"
+                      value={challenges}
+                      rows={3}
+                      onChange={(e) => setChallenges(e.target.value)}
+                      onFocus={(e) => (e.currentTarget.style.borderColor = "var(--bamboo-green)")}
+                      onBlur={(e) => (e.currentTarget.style.borderColor = "rgba(74,124,89,0.20)")}
+                    />
+                    <p style={{ fontSize: "11px", color: countWords(challenges) > WORD_LIMIT ? "var(--deadline-red)" : "var(--stone-grey)", fontFamily: "'DM Sans'", marginTop: "4px", textAlign: "right" }}>
+                      {countWords(challenges)} / {WORD_LIMIT} words
+                    </p>
+                  </>
+                )}
+              </div>
+            </>
+          )}
 
           {/* Priority */}
           <div>

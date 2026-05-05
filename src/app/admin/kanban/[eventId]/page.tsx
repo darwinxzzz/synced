@@ -9,6 +9,7 @@ import { api } from "~/trpc/react";
 import { createClient } from "~/lib/supabase/client";
 import { applyAdminOptimisticMove } from "~/lib/optimistic-updates";
 import { AdminTaskCard, type AdminTask } from "~/app/_components/admin/AdminTaskCard";
+import { AdminEditTaskDrawer } from "~/app/_components/admin/AdminEditTaskDrawer";
 import { TaskDetailDrawer } from "~/app/_components/kanban/TaskDetailDrawer";
 import { NewTaskModal } from "~/app/_components/kanban/NewTaskModal";
 import type { KanbanTask } from "~/app/_components/kanban/KanbanCard";
@@ -36,6 +37,7 @@ export default function AdminOpenBoardPage() {
   const [mobilePillar, setMobilePillar] = useState<PillarStatus>("new");
   const [dragOverPillar, setDragOverPillar] = useState<PillarStatus | null>(null);
   const [detailTask, setDetailTask] = useState<KanbanTask | null>(null);
+  const [editTask, setEditTask] = useState<AdminTask | null>(null);
   const [newTaskOpen, setNewTaskOpen] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
   const [filters, setFilters] = useState<FilterState>({ department: "", search: "" });
@@ -114,14 +116,13 @@ export default function AdminOpenBoardPage() {
   );
 
   const handleCardClick = (task: AdminTask) => {
-    // Map AdminTask → KanbanTask shape expected by TaskDetailDrawer
     const kanbanTask: KanbanTask = {
       id: task.id,
       name: task.name,
       department: task.department,
-      priority: "medium",
+      priority: task.priority ?? "medium",
       pillarStatus: task.pillarStatus,
-      deadline: null,
+      deadline: task.deadline ? new Date(task.deadline) : null,
       assignedBy: task.assigneeName,
       contributionId: null,
       isEditable: task.pillarStatus !== "done",
@@ -478,6 +479,7 @@ export default function AdminOpenBoardPage() {
                         key={task.id}
                         task={task}
                         onClick={handleCardClick}
+                        onEdit={(t) => setEditTask(t)}
                       />
                     ))
                   )}
@@ -493,6 +495,14 @@ export default function AdminOpenBoardPage() {
         open={!!detailTask}
         task={detailTask}
         onClose={() => setDetailTask(null)}
+      />
+
+      <AdminEditTaskDrawer
+        open={!!editTask}
+        task={editTask}
+        eventId={eventId}
+        onClose={() => setEditTask(null)}
+        onSuccess={() => setEditTask(null)}
       />
 
       <NewTaskModal

@@ -390,7 +390,7 @@ export const kanbanRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const [eventResult, membersResult] = await Promise.all([
         ctx.supabase.from("events").select("id, name, date, status, description").eq("id", input.eventId).single(),
-        ctx.supabase.from("event_members").select("id, task, department, pillar_status, user_id").eq("event_id", input.eventId),
+        ctx.supabase.from("event_members").select("id, task, department, pillar_status, user_id, description, outcome, priority, deadline").eq("event_id", input.eventId),
       ]);
 
       const { data: event, error: evtErr } = eventResult as unknown as {
@@ -398,7 +398,7 @@ export const kanbanRouter = createTRPCRouter({
         error: { message: string } | null;
       };
       const { data: members, error: memErr } = membersResult as unknown as {
-        data: Array<{ id: string; task: string | null; department: string | null; pillar_status: string; user_id: string }> | null;
+        data: Array<{ id: string; task: string | null; department: string | null; pillar_status: string; user_id: string; description: string | null; outcome: string | null; priority: string | null; deadline: string | null }> | null;
         error: { message: string } | null;
       };
 
@@ -426,6 +426,10 @@ export const kanbanRouter = createTRPCRouter({
           assigneeId: m.user_id,
           assigneeName: profile?.name ?? "Unknown",
           assigneeAvatar: profile?.avatar_url ?? null,
+          description: m.description,
+          outcome: m.outcome,
+          priority: (m.priority ?? "medium") as "low" | "medium" | "high",
+          deadline: m.deadline,
         };
       });
 
@@ -453,8 +457,12 @@ export const kanbanRouter = createTRPCRouter({
     .input(z.object({
       eventId: z.string().uuid(),
       userId: z.string().uuid(),
-      task: z.string().min(1).max(200),
+      task: z.string().min(1).max(80),
       department: z.string().min(1).max(100),
+      description: z.string().max(300).optional(),
+      outcome: z.string().max(300).optional(),
+      priority: z.enum(["low", "medium", "high"]).default("medium"),
+      deadline: z.string().datetime({ offset: true }).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const { data: existing } = await ctx.supabase
@@ -467,7 +475,7 @@ export const kanbanRouter = createTRPCRouter({
       if (existing) {
         const { data, error } = await ctx.supabase
           .from("event_members")
-          .update({ task: input.task, department: input.department })
+          .update({ task: input.task, department: input.department, description: input.description ?? null, outcome: input.outcome ?? null, priority: input.priority, deadline: input.deadline ?? null })
           .eq("id", existing.id)
           .select()
           .single();
@@ -477,7 +485,36 @@ export const kanbanRouter = createTRPCRouter({
 
       const { data, error } = await ctx.supabase
         .from("event_members")
-        .insert({ event_id: input.eventId, user_id: input.userId, task: input.task, department: input.department, pillar_status: "new" })
+        .insert({ event_id: input.eventId, user_id: input.userId, task: input.task, department: input.department, description: input.description ?? null, outcome: input.outcome ?? null, priority: input.priority, deadline: input.deadline ?? null, pillar_status: "new" })
+        .select()
+        .single();
+      if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+      return data;
+    }),
+
+  // ── ADMIN: Edit an existing task assignment ───────────────────────────────
+  adminUpdateTask: adminProcedure
+    .input(z.object({
+      eventMemberId: z.string().uuid(),
+      task: z.string().min(1).max(80),
+      department: z.string().min(1).max(100),
+      description: z.string().max(300).optional(),
+      outcome: z.string().max(300).optional(),
+      priority: z.enum(["low", "medium", "high"]),
+      deadline: z.string().datetime({ offset: true }).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const { data, error } = await ctx.supabase
+        .from("event_members")
+        .update({
+          task: input.task,
+          department: input.department,
+          description: input.description ?? null,
+          outcome: input.outcome ?? null,
+          priority: input.priority,
+          deadline: input.deadline ?? null,
+        })
+        .eq("id", input.eventMemberId)
         .select()
         .single();
       if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
