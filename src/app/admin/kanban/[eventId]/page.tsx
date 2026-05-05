@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Plus, SlidersHorizontal } from "lucide-react";
+import { ArrowLeft, Pencil, Plus, SlidersHorizontal } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "~/trpc/react";
 import { createClient } from "~/lib/supabase/client";
@@ -39,6 +39,7 @@ export default function AdminOpenBoardPage() {
   const [detailTask, setDetailTask] = useState<KanbanTask | null>(null);
   const [editTask, setEditTask] = useState<AdminTask | null>(null);
   const [newTaskOpen, setNewTaskOpen] = useState(false);
+  const [editMode, setEditMode] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
   const [filters, setFilters] = useState<FilterState>({ department: "", search: "" });
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -116,6 +117,10 @@ export default function AdminOpenBoardPage() {
   );
 
   const handleCardClick = (task: AdminTask) => {
+    if (editMode) {
+      setEditTask(task);
+      return;
+    }
     const kanbanTask: KanbanTask = {
       id: task.id,
       name: task.name,
@@ -334,6 +339,7 @@ export default function AdminOpenBoardPage() {
             overflowX: "auto",
             paddingBottom: "12px",
             scrollbarWidth: "none",
+            alignItems: "center",
           }}
         >
           {PILLARS.map((p) => {
@@ -367,6 +373,28 @@ export default function AdminOpenBoardPage() {
               </button>
             );
           })}
+          {/* Edit-mode toggle — far right of tab row */}
+          <button
+            onClick={() => setEditMode((v) => !v)}
+            title={editMode ? "Exit edit mode" : "Enter edit mode"}
+            style={{
+              flexShrink: 0,
+              marginLeft: "auto",
+              width: "32px",
+              height: "32px",
+              borderRadius: "99px",
+              border: `1.5px solid ${editMode ? "var(--bamboo-green)" : "rgba(140,140,140,0.20)"}`,
+              background: editMode ? "rgba(74,124,89,0.10)" : "transparent",
+              color: editMode ? "var(--bamboo-green)" : "var(--stone-grey)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer",
+              transition: "all 0.2s",
+            }}
+          >
+            <Pencil size={13} />
+          </button>
         </div>
 
         {/* Kanban board */}
@@ -435,6 +463,30 @@ export default function AdminOpenBoardPage() {
                   >
                     {colTasks.length}
                   </span>
+                  {/* Desktop edit-mode toggle — only on the Done column */}
+                  {pillar === "done" && (
+                    <button
+                      className="hidden md:flex"
+                      onClick={() => setEditMode((v) => !v)}
+                      title={editMode ? "Exit edit mode" : "Enter edit mode"}
+                      style={{
+                        marginLeft: "auto",
+                        width: "28px",
+                        height: "28px",
+                        borderRadius: "8px",
+                        border: `1.5px solid ${editMode ? "var(--bamboo-green)" : "rgba(140,140,140,0.20)"}`,
+                        background: editMode ? "rgba(74,124,89,0.10)" : "transparent",
+                        color: editMode ? "var(--bamboo-green)" : "var(--stone-grey)",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        cursor: "pointer",
+                        transition: "all 0.2s",
+                        flexShrink: 0,
+                      }}
+                    >
+                      <Pencil size={12} />
+                    </button>
+                  )}
                 </div>
 
                 {/* Drop zone */}
@@ -479,7 +531,6 @@ export default function AdminOpenBoardPage() {
                         key={task.id}
                         task={task}
                         onClick={handleCardClick}
-                        onEdit={(t) => setEditTask(t)}
                       />
                     ))
                   )}

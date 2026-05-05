@@ -1,8 +1,6 @@
 "use client";
 
-import { useState } from "react";
 import Image from "next/image";
-import { Pencil } from "lucide-react";
 
 export interface AdminTask {
   id: string;
@@ -21,7 +19,6 @@ export interface AdminTask {
 interface AdminTaskCardProps {
   task: AdminTask;
   onClick: (task: AdminTask) => void;
-  onEdit?: (task: AdminTask) => void;
   dragging?: boolean;
 }
 
@@ -64,8 +61,7 @@ function DepartmentBadge({ dept }: { dept: string }) {
   );
 }
 
-export function AdminTaskCard({ task, onClick, onEdit, dragging }: AdminTaskCardProps) {
-  const [hovered, setHovered] = useState(false);
+export function AdminTaskCard({ task, onClick, dragging }: AdminTaskCardProps) {
   const dotColor = STATUS_DOT[task.pillarStatus] ?? "var(--stone-grey)";
   const initials = task.assigneeName
     .split(" ")
@@ -84,11 +80,9 @@ export function AdminTaskCard({ task, onClick, onEdit, dragging }: AdminTaskCard
       onDragStart={handleDragStart}
       onClick={() => onClick(task)}
       onMouseEnter={(e) => {
-        setHovered(true);
         e.currentTarget.style.boxShadow = "0 2px 12px rgba(28,58,43,0.10)";
       }}
       onMouseLeave={(e) => {
-        setHovered(false);
         e.currentTarget.style.boxShadow = "";
       }}
       className="card-shadow"
@@ -108,36 +102,6 @@ export function AdminTaskCard({ task, onClick, onEdit, dragging }: AdminTaskCard
     >
       {/* Dept badge */}
       <DepartmentBadge dept={task.department || "General"} />
-
-      {/* Hover-reveal edit button */}
-      {onEdit && (
-        <button
-          onClick={(e) => { e.stopPropagation(); onEdit(task); }}
-          style={{
-            position: "absolute",
-            top: "10px",
-            right: "10px",
-            width: "28px",
-            height: "28px",
-            borderRadius: "8px",
-            border: "1px solid rgba(74,124,89,0.20)",
-            background: "var(--ivory-paper)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            cursor: "pointer",
-            opacity: hovered ? 1 : 0,
-            transform: hovered ? "scale(1)" : "scale(0.85)",
-            transition: "opacity 0.15s, transform 0.15s",
-            zIndex: 1,
-          }}
-          onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(74,124,89,0.10)")}
-          onMouseLeave={(e) => (e.currentTarget.style.background = "var(--ivory-paper)")}
-          title="Edit task"
-        >
-          <Pencil size={13} color="var(--bamboo-green)" />
-        </button>
-      )}
 
       {/* Task name */}
       <p

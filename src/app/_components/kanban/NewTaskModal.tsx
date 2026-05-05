@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Image from "next/image";
 import { X, ChevronDown } from "lucide-react";
+import { DeadlinePicker } from "~/app/_components/shared/DeadlinePicker";
 import { toast } from "sonner";
 import { api } from "~/trpc/react";
 import {
@@ -147,7 +148,7 @@ export function NewTaskModal({ open, eventId, onClose, onSuccess }: NewTaskModal
       userId: selectedUserId,
       task: task.trim(),
       department,
-      deadline: deadline ? new Date(deadline).toISOString() : undefined,
+      deadline: deadline || undefined,
       description: description.trim() || undefined,
       outcome: outcome.trim() || undefined,
       priority,
@@ -279,30 +280,11 @@ export function NewTaskModal({ open, eventId, onClose, onSuccess }: NewTaskModal
           {/* 3. Deadline */}
           <div>
             <label style={labelStyle}>Deadline (optional)</label>
-            <input
-              type="datetime-local"
+            <DeadlinePicker
               value={deadline}
-              onChange={(e) => setDeadline(e.target.value)}
-              style={{
-                width: "100%",
-                height: "40px",
-                padding: "0 12px",
-                borderRadius: "10px",
-                border: "1px solid rgba(74,124,89,0.20)",
-                background: "var(--ivory-paper)",
-                fontFamily: "'DM Sans', sans-serif",
-                fontSize: "14px",
-                color: deadline ? "var(--charcoal-ink)" : "var(--stone-grey)",
-                outline: "none",
-                boxSizing: "border-box" as const,
-                cursor: "pointer",
-              }}
-              onFocus={(e) => (e.currentTarget.style.borderColor = "var(--bamboo-green)")}
-              onBlur={(e) => (e.currentTarget.style.borderColor = "rgba(74,124,89,0.20)")}
+              onChange={(iso) => setDeadline(iso)}
+              onClear={() => setDeadline("")}
             />
-            <p style={{ fontSize: "11px", color: "var(--stone-grey)", fontFamily: "'DM Sans'", marginTop: "4px" }}>
-              Set a target deadline for this task
-            </p>
           </div>
 
           {/* 4. Detailed Description */}

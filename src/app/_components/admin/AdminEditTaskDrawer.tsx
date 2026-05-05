@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { api } from "~/trpc/react";
 import { SlideDrawer } from "~/app/_components/shared/SlideDrawer";
+import { DeadlinePicker } from "~/app/_components/shared/DeadlinePicker";
 import type { AdminTask } from "./AdminTaskCard";
 
 interface AdminEditTaskDrawerProps {
@@ -93,14 +94,7 @@ export function AdminEditTaskDrawer({ open, task, eventId, onClose, onSuccess }:
       setDescription(task.description ?? "");
       setOutcome(task.outcome ?? "");
       setPriority(task.priority ?? "medium");
-      // Convert ISO deadline to datetime-local format
-      if (task.deadline) {
-        const d = new Date(task.deadline);
-        const pad = (n: number) => String(n).padStart(2, "0");
-        setDeadline(`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`);
-      } else {
-        setDeadline("");
-      }
+      setDeadline(task.deadline ?? "");
     }
   }, [task?.id]);
 
@@ -116,7 +110,7 @@ export function AdminEditTaskDrawer({ open, task, eventId, onClose, onSuccess }:
       description: description.trim() || undefined,
       outcome: outcome.trim() || undefined,
       priority,
-      deadline: deadline ? new Date(deadline).toISOString() : undefined,
+      deadline: deadline || undefined,
     });
   };
 
@@ -189,13 +183,10 @@ export function AdminEditTaskDrawer({ open, task, eventId, onClose, onSuccess }:
           {/* Deadline */}
           <div>
             <label style={labelStyle}>Deadline (optional)</label>
-            <input
-              type="datetime-local"
-              style={{ ...inputStyle, cursor: "pointer" }}
+            <DeadlinePicker
               value={deadline}
-              onChange={(e) => setDeadline(e.target.value)}
-              onFocus={(e) => (e.currentTarget.style.borderColor = "var(--bamboo-green)")}
-              onBlur={(e) => (e.currentTarget.style.borderColor = "rgba(74,124,89,0.20)")}
+              onChange={(iso) => setDeadline(iso)}
+              onClear={() => setDeadline("")}
             />
           </div>
 
