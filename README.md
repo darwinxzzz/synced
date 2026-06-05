@@ -1,205 +1,87 @@
-# Event Sync
+# Synced
 
 ![Next.js](https://img.shields.io/badge/Next.js_15-black?style=flat-square&logo=next.js)
 ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=white)
 ![Supabase](https://img.shields.io/badge/Supabase-3ECF8E?style=flat-square&logo=supabase&logoColor=white)
 ![tRPC](https://img.shields.io/badge/tRPC-2596BE?style=flat-square&logo=trpc&logoColor=white)
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS_v4-06B6D4?style=flat-square&logo=tailwindcss&logoColor=white)
-![Vercel](https://img.shields.io/badge/Vercel-black?style=flat-square&logo=vercel)
-![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)
 
-A production-ready community event tracking platform built with the T3 stack. Two user roles - Admin (Exco) and Member - with distinct views, permissions, and interactions. Visual theme inspired by the Arashiyama Bamboo Grove, Kyoto.
+Synced is a full-stack community event coordination platform for admins and members. It supports event operations, attendance tracking, contribution visibility, workflow coordination, and testimonial/reflection flows in one role-aware application.
 
-## Screenshots
+## Project Overview
 
-> Add a screenshot of the app here. Place the image at `public/screenshot.png` and uncomment the line below.
-<!-- ![EventSync Dashboard](public/screenshot.png) -->
+Synced is designed around two primary user groups:
+
+- **Admins** manage the operational side of community events through dashboard views, attendance workflows, kanban/event tracking, and testimonial moderation.
+- **Members** use dedicated views for their dashboard, contribution tracking, kanban participation, and testimonial or reflection submissions.
+
+The application is built with the Next.js App Router, TypeScript, tRPC routers, and Supabase. Supabase Auth handles identity, Postgres stores the application data, Row Level Security protects access at the database layer, and a server-side admin client is used only for trusted server operations that require elevated privileges.
+
+Reliability and security are core design concerns. Synced uses RLS-first access control, protected tRPC procedures, schema validation at API and environment boundaries, optimistic UI with server reconciliation for responsive workflows, and a test strategy that includes unit, integration, and end-to-end coverage.
+
+## Current Status
+
+Synced is still under active development. The current focus is fixing bugs, improving stability, and hardening reliability across critical admin and member workflows.
+
+The project should not be treated as production-ready until `pnpm run check`, the test suite, and critical user flows are consistently green.
 
 ## Tech Stack
 
 | Layer | Technology |
 |---|---|
-| Framework | Next.js 15 (App Router) |
-| Language | TypeScript (strict mode) |
+| Framework | Next.js 15 App Router |
+| Language | TypeScript |
 | API | tRPC v11 |
 | Styling | Tailwind CSS v4 |
-| Auth + DB | Supabase Auth + Postgres + RLS |
-| Realtime + Storage | Supabase |
-| Deployment | Vercel |
-
-## Commands
-
-| Command | Description |
-|---|---|
-| `pnpm dev` | Start development server with Turbopack |
-| `pnpm build` | Production build |
-| `pnpm start` | Start production server |
-| `pnpm check` | Run ESLint + TypeScript checks |
-| `pnpm lint` | Run ESLint |
-| `pnpm lint:fix` | Run ESLint with auto-fix |
-| `pnpm format:check` | Check formatting with Prettier |
-| `pnpm format:write` | Auto-format all files with Prettier |
-| `pnpm typecheck` | Run TypeScript compiler check only |
-| `pnpm test` | Run Vitest tests |
-| `pnpm preview` | Build then start (production preview) |
-
-## Environment Variables
-
-Copy `.env.example` to `.env` and fill values:
-
-| Variable | Required | Description |
-|---|---|---|
-| `NEXT_PUBLIC_SUPABASE_URL` | Yes | Supabase project URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | Supabase anon key (safe to expose; RLS still applies) |
-| `SUPABASE_SERVICE_ROLE_KEY` | Yes (server-only) | Privileged key for trusted server operations |
-| `GOOGLE_STITCH_API_KEY` | Yes (server-only, if using Stitch) | API key for Google Stitch integration |
-| `NODE_ENV` | Auto | `development`, `test`, or `production` |
-
-Schema validation source of truth: `src/env.js`.
-
-## Project Structure
-
-```text
-src/
-  app/
-    (auth)/login/                # login route
-    member/
-      dashboard/                 # member dashboard
-      kanban/                    # member kanban
-    api/trpc/[trpc]/route.ts     # tRPC HTTP handler
-    _components/                 # UI components by feature
-  lib/
-    supabase/
-      client.ts                  # browser client
-      server.ts                  # SSR cookie-aware client
-      admin.ts                   # service-role client (server-only)
-  server/
-    api/
-      root.ts                    # tRPC root router
-      routers/                   # domain routers
-      trpc.ts                    # context + procedure guards
-    ai/
-      guard.ts                   # AI quota reservation + usage logging
-  types/
-    database.ts                  # app DB types
-    supabase.ts                  # generated from linked remote project
-
-supabase/
-  migrations/                    # SQL migrations (remote + local changes)
-  EVENTSYNC_SUPABASE_REFERENCE.md
-```
-
-## Supabase Architecture (Reusable Pattern)
-
-This section is written so you can reuse the same approach in your next project.
-
-### Core data model
-
-Main tables:
-
-- `profiles`
-- `events`
-- `event_members`
-- `attendance`
-- `contributions`
-- `reflections`
-- `testimonial_requests`
-- `testimonials`
-
-Key enums in `public`:
-
-- `department`: `Software`, `Meet-ups`, `Inspire`, `Publicity`, `Connectors`, `Labs`
-- `priority`: `high`, `medium`, `low`
-- `roles`: `admin`, `lead`, `member`
-- `status`: `attended`, `excused`, `absent`
-
-### RLS policy strategy
-
-Pattern used:
-
-- Enable RLS on every domain table.
-- Members can read/write only their own rows (`auth.uid() = user_id` style checks).
-- Admin-wide access is checked from DB role state (`public.is_admin()`) instead of trusting JWT metadata.
-- For risky write paths, use explicit `WITH CHECK` constraints and narrow operation scope (`INSERT` / `UPDATE` instead of broad `FOR ALL`).
-
-Practical examples in this repo:
-
-- `profiles`: owner or admin can read profile rows.
-- `events`: authenticated users read; admin controls insert/update.
-- `event_members`: member reads own assignments; admin manages globally.
-- `reflections`: member insert/update own records; admin read/update oversight.
-
-### RPC and function security
-
-Pattern used:
-
-- Sensitive functions are `SECURITY DEFINER` plus explicit admin guard checks.
-- Execute permissions are explicitly granted/revoked per function.
-- Avoid exposing privileged behavior through default `PUBLIC` execute grants.
-
-### AI abuse/cost guardrails
-
-DB objects added:
-
-- `ai_usage_limits` (per-user limits / temporary blocks)
-- `ai_usage_daily` (per-day counters)
-- `ai_usage_events` (immutable usage/audit log)
-- `consume_ai_quota(...)`
-- `log_ai_usage_event(...)`
-
-Server helpers:
-
-- `src/lib/supabase/admin.ts`
-- `src/server/ai/guard.ts`
-
-Usage flow:
-
-1. Reserve quota before provider call (`reserveAiQuota` -> `consume_ai_quota`).
-2. Call provider with strict model/output limits.
-3. Log result/tokens/cost (`logAiUsage` -> `log_ai_usage_event`).
-
-## Supabase CLI Workflow
-
-```bash
-pnpm exec supabase link --project-ref <project-ref>
-pnpm exec supabase migration list
-pnpm exec supabase db pull
-pnpm exec supabase db push
-pnpm exec supabase gen types typescript --linked > src/types/supabase.ts
-```
+| Auth + Database | Supabase Auth, Postgres, RLS |
+| Testing | Vitest, Playwright |
 
 ## Local Setup
+
+### Prerequisites
+
+- Node.js
+- pnpm
+- Supabase project
+
+### Install and Run
 
 ```bash
 pnpm install
 cp .env.example .env
+```
+
+Fill the Supabase environment variables in `.env`, including the public project URL, anon key, and any server-only keys required by local workflows.
+
+```bash
 pnpm dev
 ```
 
 Open `http://localhost:3000`.
 
-## Additional Reference
+## Testing
 
-For the full EventSync-specific Supabase snapshot (tables, functions, policy inventory), see:
+```bash
+pnpm test
+pnpm run typecheck
+pnpm run check
+```
 
-- `supabase/EVENTSYNC_SUPABASE_REFERENCE.md`
+Integration and end-to-end commands should be run only when the required Supabase credentials and test environment variables are configured.
 
-## Key Engineering Decisions
+## Next Steps
 
-### Row-Level Security over application-layer guards
-Enforcing access control at the Postgres RLS layer rather than in API code means the policy travels with the data — a missed guard in a new endpoint can't accidentally expose rows. Every domain table has RLS enabled; admin checks read from `public.is_admin()` in the DB rather than trusting JWT metadata that could be spoofed.
-
-### tRPC for end-to-end type safety
-Replacing a REST layer with tRPC means the TypeScript types for every procedure input and output are inferred automatically. No more hand-maintaining OpenAPI specs or casting `unknown` response bodies — a schema change propagates a compiler error across the full stack.
-
-### AI quota reservation before provider call
-The `reserveAiQuota` → provider call → `logAiUsage` pattern (see `src/server/ai/guard.ts`) prevents runaway AI spend. Quota is consumed atomically before the expensive call; if the call fails, the log records the miss. Per-user daily limits live in `ai_usage_limits` and are checked server-side, never client-side.
-
-### Optimistic UI with server reconciliation
-Kanban and attendance UIs apply state changes locally before the tRPC mutation resolves, then reconcile with the server response. This removes perceived latency on slow connections without sacrificing correctness — the server response is still the source of truth.
+- Resolve known lint and build issues.
+- Simplify large routers and page components.
+- Expand integration and end-to-end coverage for critical flows.
+- Improve error handling and loading states.
+- Document Supabase setup, RLS assumptions, and required environment variables.
+- Add CI checks before merging changes.
 
 ## Security Notes
 
-- Never expose `SUPABASE_SERVICE_ROLE_KEY` to client code.
-- Keep privileged DB actions behind server routes/procedures only.
-- Treat migrations as audit history; avoid ad-hoc production SQL drift.
+- Keep `SUPABASE_SERVICE_ROLE_KEY` server-only.
+- Route privileged operations through protected server procedures.
+- Treat RLS policies as the first line of data access control.
+- Validate inputs at system boundaries before performing mutations.
+- Review migrations and access policy changes carefully before applying them to shared environments.
