@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Lock } from "lucide-react";
 import { toast } from "sonner";
 import { SlideDrawer } from "~/app/_components/shared/SlideDrawer";
+import { ConfirmSaveBar } from "~/app/_components/shared/ConfirmSaveBar";
 import type { KanbanTask } from "./KanbanCard";
 
 function countWords(text: string): number {
@@ -42,15 +43,6 @@ const textareaStyle: React.CSSProperties = {
   resize: "vertical",
   transition: "border-color 0.2s",
   boxSizing: "border-box" as const,
-};
-
-const readonlyTextareaStyle: React.CSSProperties = {
-  ...textareaStyle,
-  background: "rgba(140,140,140,0.06)",
-  border: "1px solid rgba(140,140,140,0.14)",
-  color: "var(--stone-grey)",
-  cursor: "default",
-  resize: "none",
 };
 
 const roStyle: React.CSSProperties = {
@@ -94,17 +86,19 @@ export function TaskDetailDrawer({ open, task, onClose, onSave }: TaskDetailDraw
   const [challenges, setChallenges] = useState("");
   const [priority, setPriority] = useState<Priority>("medium");
   const [saving, setSaving] = useState(false);
+  const [confirming, setConfirming] = useState(false);
 
   // Sync form when task changes
   useEffect(() => {
     if (task) {
-      setDescription("");
-      setOutcome("");
-      setChanges("");
-      setChallenges("");
+      setDescription(task.description ?? "");
+      setOutcome(task.outcome ?? "");
+      setChanges(task.changes ?? "");
+      setChallenges(task.challengesFaced ?? "");
       setPriority(task.priority);
+      setConfirming(false);
     }
-  }, [task?.id]);
+  }, [task]);
 
   const handleSave = async () => {
     if (!task?.contributionId || !onSave) return;
@@ -127,10 +121,12 @@ export function TaskDetailDrawer({ open, task, onClose, onSave }: TaskDetailDraw
     }
   };
 
-  const footer = isLocked ? null : (
+  const canSave = Boolean(onSave && task?.contributionId);
+
+  const footer = !canSave ? null : (
     <div style={{ display: "flex", gap: "10px" }}>
       <button
-        onClick={handleSave}
+        onClick={() => setConfirming(true)}
         disabled={saving}
         style={{
           flex: 1,
@@ -175,7 +171,7 @@ export function TaskDetailDrawer({ open, task, onClose, onSave }: TaskDetailDraw
       open={open}
       onClose={onClose}
       title={task?.name ?? "Task Detail"}
-      subtitle={isLocked ? undefined : "Edit your contribution details below."}
+      subtitle={isLocked ? "Review contribution details below." : "Edit your contribution details below."}
       footer={footer ?? undefined}
     >
       {!task ? null : (
@@ -220,102 +216,85 @@ export function TaskDetailDrawer({ open, task, onClose, onSave }: TaskDetailDraw
 
           {/* Editable / locked fields */}
           <div>
-            <label style={isLocked ? readonlyLabelStyle : labelStyle}>Detailed Description</label>
-            {isLocked ? (
-              <textarea style={readonlyTextareaStyle} readOnly value={description} rows={3} />
-            ) : (
-              <>
-                <textarea
-                  style={textareaStyle}
-                  placeholder="30 words max…"
-                  value={description}
-                  rows={3}
-                  onChange={(e) => setDescription(e.target.value)}
-                  onFocus={(e) => (e.currentTarget.style.borderColor = "var(--bamboo-green)")}
-                  onBlur={(e) => (e.currentTarget.style.borderColor = "rgba(74,124,89,0.20)")}
-                />
-                <p style={{ fontSize: "11px", color: countWords(description) > WORD_LIMIT ? "var(--deadline-red)" : "var(--stone-grey)", fontFamily: "'DM Sans'", marginTop: "4px", textAlign: "right" }}>
-                  {countWords(description)} / {WORD_LIMIT} words
-                </p>
-              </>
-            )}
-          </div>
-
-          <div>
-            <label style={isLocked ? readonlyLabelStyle : labelStyle}>Aimed Result / Outcome *</label>
-            {isLocked ? (
-              <textarea style={readonlyTextareaStyle} readOnly value={outcome} rows={3} />
-            ) : (
+            <label style={labelStyle}>Detailed Description</label>
+            <>
               <textarea
                 style={textareaStyle}
-                placeholder="Describe the intended result…"
-                value={outcome}
+                placeholder="30 words max…"
+                value={description}
                 rows={3}
-                onChange={(e) => setOutcome(e.target.value)}
+                onChange={(e) => setDescription(e.target.value)}
                 onFocus={(e) => (e.currentTarget.style.borderColor = "var(--bamboo-green)")}
                 onBlur={(e) => (e.currentTarget.style.borderColor = "rgba(74,124,89,0.20)")}
               />
-            )}
+              <p style={{ fontSize: "11px", color: countWords(description) > WORD_LIMIT ? "var(--deadline-red)" : "var(--stone-grey)", fontFamily: "'DM Sans'", marginTop: "4px", textAlign: "right" }}>
+                {countWords(description)} / {WORD_LIMIT} words
+              </p>
+            </>
+          </div>
+
+          <div>
+            <label style={labelStyle}>Aimed Result / Outcome *</label>
+            <textarea
+              style={textareaStyle}
+              placeholder="Describe the intended result…"
+              value={outcome}
+              rows={3}
+              onChange={(e) => setOutcome(e.target.value)}
+              onFocus={(e) => (e.currentTarget.style.borderColor = "var(--bamboo-green)")}
+              onBlur={(e) => (e.currentTarget.style.borderColor = "rgba(74,124,89,0.20)")}
+            />
           </div>
 
           {task.pillarStatus !== "new" && (
             <>
               <div>
-                <label style={isLocked ? readonlyLabelStyle : labelStyle}>Changes Made</label>
-                {isLocked ? (
-                  <textarea style={readonlyTextareaStyle} readOnly value={changes} rows={3} />
-                ) : (
-                  <>
-                    <textarea
-                      style={textareaStyle}
-                      placeholder="30 words max…"
-                      value={changes}
-                      rows={3}
-                      onChange={(e) => setChanges(e.target.value)}
-                      onFocus={(e) => (e.currentTarget.style.borderColor = "var(--bamboo-green)")}
-                      onBlur={(e) => (e.currentTarget.style.borderColor = "rgba(74,124,89,0.20)")}
-                    />
-                    <p style={{ fontSize: "11px", color: countWords(changes) > WORD_LIMIT ? "var(--deadline-red)" : "var(--stone-grey)", fontFamily: "'DM Sans'", marginTop: "4px", textAlign: "right" }}>
-                      {countWords(changes)} / {WORD_LIMIT} words
-                    </p>
-                  </>
-                )}
+                <label style={labelStyle}>Changes Made</label>
+                <>
+                  <textarea
+                    style={textareaStyle}
+                    placeholder="30 words max…"
+                    value={changes}
+                    rows={3}
+                    onChange={(e) => setChanges(e.target.value)}
+                    onFocus={(e) => (e.currentTarget.style.borderColor = "var(--bamboo-green)")}
+                    onBlur={(e) => (e.currentTarget.style.borderColor = "rgba(74,124,89,0.20)")}
+                  />
+                  <p style={{ fontSize: "11px", color: countWords(changes) > WORD_LIMIT ? "var(--deadline-red)" : "var(--stone-grey)", fontFamily: "'DM Sans'", marginTop: "4px", textAlign: "right" }}>
+                    {countWords(changes)} / {WORD_LIMIT} words
+                  </p>
+                </>
               </div>
 
               <div>
-                <label style={isLocked ? readonlyLabelStyle : labelStyle}>Challenges Faced</label>
-                {isLocked ? (
-                  <textarea style={readonlyTextareaStyle} readOnly value={challenges} rows={3} />
-                ) : (
-                  <>
-                    <textarea
-                      style={textareaStyle}
-                      placeholder="30 words max…"
-                      value={challenges}
-                      rows={3}
-                      onChange={(e) => setChallenges(e.target.value)}
-                      onFocus={(e) => (e.currentTarget.style.borderColor = "var(--bamboo-green)")}
-                      onBlur={(e) => (e.currentTarget.style.borderColor = "rgba(74,124,89,0.20)")}
-                    />
-                    <p style={{ fontSize: "11px", color: countWords(challenges) > WORD_LIMIT ? "var(--deadline-red)" : "var(--stone-grey)", fontFamily: "'DM Sans'", marginTop: "4px", textAlign: "right" }}>
-                      {countWords(challenges)} / {WORD_LIMIT} words
-                    </p>
-                  </>
-                )}
+                <label style={labelStyle}>Challenges Faced</label>
+                <>
+                  <textarea
+                    style={textareaStyle}
+                    placeholder="30 words max…"
+                    value={challenges}
+                    rows={3}
+                    onChange={(e) => setChallenges(e.target.value)}
+                    onFocus={(e) => (e.currentTarget.style.borderColor = "var(--bamboo-green)")}
+                    onBlur={(e) => (e.currentTarget.style.borderColor = "rgba(74,124,89,0.20)")}
+                  />
+                  <p style={{ fontSize: "11px", color: countWords(challenges) > WORD_LIMIT ? "var(--deadline-red)" : "var(--stone-grey)", fontFamily: "'DM Sans'", marginTop: "4px", textAlign: "right" }}>
+                    {countWords(challenges)} / {WORD_LIMIT} words
+                  </p>
+                </>
               </div>
             </>
           )}
 
           {/* Priority */}
           <div>
-            <label style={isLocked ? readonlyLabelStyle : labelStyle}>Priority Level</label>
+            <label style={labelStyle}>Priority Level</label>
             <div style={{ display: "flex", gap: "8px" }}>
               {PRIORITY_OPTS.map((opt) => {
                 const active = priority === opt.value;
                 return (
                   <button
                     key={opt.value}
-                    disabled={isLocked}
                     onClick={() => setPriority(opt.value)}
                     style={{
                       flex: 1,
@@ -327,7 +306,7 @@ export function TaskDetailDrawer({ open, task, onClose, onSave }: TaskDetailDraw
                       fontFamily: "'DM Sans', sans-serif",
                       fontSize: "13px",
                       fontWeight: active ? 700 : 500,
-                      cursor: isLocked ? "default" : "pointer",
+                      cursor: "pointer",
                       transition: "all 0.2s",
                     }}
                   >
@@ -337,6 +316,15 @@ export function TaskDetailDrawer({ open, task, onClose, onSave }: TaskDetailDraw
               })}
             </div>
           </div>
+          {confirming && canSave && (
+            <ConfirmSaveBar
+              loading={saving}
+              onConfirm={() => {
+                void handleSave();
+              }}
+              onCancel={() => setConfirming(false)}
+            />
+          )}
         </div>
       )}
     </SlideDrawer>

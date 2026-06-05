@@ -4,6 +4,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { api } from "~/trpc/react";
 import { ReflectionDetailModal, type ReflectionItem } from "~/app/_components/shared/ReflectionDetailModal";
+import { ConfirmSaveBar } from "~/app/_components/shared/ConfirmSaveBar";
 import { ContributionTimeline } from "./ContributionTimeline";
 import { EndorsementBlock } from "./EndorsementBlock";
 
@@ -45,6 +46,7 @@ export function MemberTestimonialView({
 }: MemberTestimonialViewProps) {
   const [openReflection, setOpenReflection] = useState<ReflectionItem | null>(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [confirmingSave, setConfirmingSave] = useState(false);
   const [editName, setEditName] = useState("");
   const [editDepartment, setEditDepartment] = useState("");
 
@@ -107,11 +109,13 @@ export function MemberTestimonialView({
     setEditName(profile.name);
     setEditDepartment(profile.department ?? "");
     setIsEditing(true);
+    setConfirmingSave(false);
   };
 
   const handleEditSave = () => {
     toast.success("Details updated");
     setIsEditing(false);
+    setConfirmingSave(false);
   };
 
   return (
@@ -185,13 +189,19 @@ export function MemberTestimonialView({
             </p>
 
             {isEditing && (
-              <div style={{ display: "flex", gap: "8px", marginTop: "16px" }} className="no-print">
-                <button type="button" onClick={handleEditSave} style={{ height: "32px", padding: "0 18px", borderRadius: "8px", border: "none", background: "var(--bamboo-green)", color: "white", fontFamily: "'DM Sans', sans-serif", fontWeight: 600, fontSize: "12px", cursor: "pointer" }}>
+              <div style={{ display: "flex", gap: "8px", marginTop: "16px", flexDirection: "column", maxWidth: "360px" }} className="no-print">
+                <button type="button" onClick={() => setConfirmingSave(true)} style={{ height: "32px", padding: "0 18px", borderRadius: "8px", border: "none", background: "var(--bamboo-green)", color: "white", fontFamily: "'DM Sans', sans-serif", fontWeight: 600, fontSize: "12px", cursor: "pointer" }}>
                   Save
                 </button>
-                <button type="button" onClick={() => setIsEditing(false)} style={{ height: "32px", padding: "0 18px", borderRadius: "8px", border: "1px solid rgba(74,124,89,0.25)", background: "transparent", color: "var(--stone-grey)", fontFamily: "'DM Sans', sans-serif", fontWeight: 600, fontSize: "12px", cursor: "pointer" }}>
+                <button type="button" onClick={() => { setIsEditing(false); setConfirmingSave(false); }} style={{ height: "32px", padding: "0 18px", borderRadius: "8px", border: "1px solid rgba(74,124,89,0.25)", background: "transparent", color: "var(--stone-grey)", fontFamily: "'DM Sans', sans-serif", fontWeight: 600, fontSize: "12px", cursor: "pointer" }}>
                   Cancel
                 </button>
+                {confirmingSave && (
+                  <ConfirmSaveBar
+                    onConfirm={handleEditSave}
+                    onCancel={() => setConfirmingSave(false)}
+                  />
+                )}
               </div>
             )}
           </div>

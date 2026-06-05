@@ -5,7 +5,6 @@ import { Suspense, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { toast } from "sonner"
 
-import { Button } from "~/app/_components/ui/button"
 import { Input } from "~/app/_components/ui/input"
 import { createClient } from "~/lib/supabase/client"
 import { FieldLabel, GoogleIcon, HoverTapButton, InputWrapper } from "./_components/auth-atoms"

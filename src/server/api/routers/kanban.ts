@@ -45,7 +45,9 @@ export const kanbanRouter = createTRPCRouter({
       // may not exist in the generated types yet — Supabase CLI would show SelectQueryError
       const { data, error } = await ctx.supabase
         .from("event_members")
-        .select("id, task, department, pillar_status, event_id, contributions(id)")
+        .select(
+          "id, task, department, pillar_status, event_id, outcome, priority, deadline"
+        )
         .eq("user_id", ctx.user.id)
         .eq("event_id", input.eventId) as unknown as {
           data: Array<{
@@ -53,20 +55,44 @@ export const kanbanRouter = createTRPCRouter({
             task: string | null;
             department: string | null;
             pillar_status: string | null;
+            outcome?: string | null;
             deadline?: string | null;
             priority?: string | null;
-            assigned_by?: string | null;
             event_id: string;
-            contributions: { id: string }[] | null;
           }> | null;
           error: { message: string } | null;
         };
 
       if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
 
+      const { data: contributions, error: contribErr } = await ctx.supabase
+        .from("contributions")
+        .select("id, event_id, user_id, description, changes, challenges")
+        .eq("user_id", ctx.user.id)
+        .eq("event_id", input.eventId) as unknown as {
+          data: Array<{
+            id: string;
+            event_id: string | null;
+            user_id: string;
+            description: string | null;
+            changes: string | null;
+            challenges: string | null;
+          }> | null;
+          error: { message: string } | null;
+        };
+
+      if (contribErr) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: contribErr.message });
+
+      const contributionByEventUser = new Map(
+        (contributions ?? []).map((contribution) => [
+          `${contribution.event_id}:${contribution.user_id}`,
+          contribution,
+        ])
+      );
+
       return (data ?? []).map((row) => {
-        const contribs = row.contributions;
-        const contributionId = contribs?.[0]?.id ?? null;
+        const contribution = contributionByEventUser.get(`${row.event_id}:${ctx.user.id}`) ?? null;
+        const contributionId = contribution?.id ?? null;
         const status = (row.pillar_status ?? "new") as PillarStatus;
 
         return {
@@ -76,8 +102,12 @@ export const kanbanRouter = createTRPCRouter({
           priority: ((row.priority ?? "medium") as "low" | "medium" | "high"),
           pillarStatus: status,
           deadline: row.deadline ? new Date(row.deadline) : null,
-          assignedBy: row.assigned_by ?? "Admin",
+          assignedBy: "Admin",
           contributionId,
+          description: contribution?.description ?? "",
+          outcome: row.outcome ?? "",
+          changes: contribution?.changes ?? "",
+          challengesFaced: contribution?.challenges ?? "",
           isEditable: status !== "done",
         };
       });
@@ -248,15 +278,36 @@ export const kanbanRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      const { data: row, error: fetchErr } = await ctx.supabase
+        .from("event_members")
+        .select("id, pillar_status")
+        .eq("event_id", input.eventId)
+        .eq("user_id", ctx.user.id)
+        .single();
+
+      if (fetchErr ?? !row) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Task not found" });
+      }
+
+      const current = (row.pillar_status ?? "new") as PillarStatus;
+      const allowed = ALLOWED_TRANSITIONS[current];
+
+      if (!allowed.includes(input.status)) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: `Cannot move from ${current} to ${input.status}`,
+        });
+      }
+
       const { data, error } = await ctx.supabase
         .from("event_members")
         .update({ pillar_status: input.status })
-        .eq("event_id", input.eventId)
+        .eq("id", row.id)
         .eq("user_id", ctx.user.id)
         .select()
         .single();
 
-      if (error) throw new Error(error.message);
+      if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
       return data;
     }),
 
@@ -390,7 +441,12 @@ export const kanbanRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const [eventResult, membersResult] = await Promise.all([
         ctx.supabase.from("events").select("id, name, date, status, description").eq("id", input.eventId).single(),
-        ctx.supabase.from("event_members").select("id, task, department, pillar_status, user_id, description, outcome, priority, deadline").eq("event_id", input.eventId),
+        ctx.supabase
+          .from("event_members")
+          .select(
+            "id, task, department, outcome, pillar_status, user_id, priority, deadline"
+          )
+          .eq("event_id", input.eventId),
       ]);
 
       const { data: event, error: evtErr } = eventResult as unknown as {
@@ -398,7 +454,16 @@ export const kanbanRouter = createTRPCRouter({
         error: { message: string } | null;
       };
       const { data: members, error: memErr } = membersResult as unknown as {
-        data: Array<{ id: string; task: string | null; department: string | null; pillar_status: string; user_id: string; description: string | null; outcome: string | null; priority: string | null; deadline: string | null }> | null;
+        data: Array<{
+          id: string;
+          task: string | null;
+          department: string | null;
+          outcome: string | null;
+          pillar_status: string;
+          user_id: string;
+          priority: string | null;
+          deadline: string | null;
+        }> | null;
         error: { message: string } | null;
       };
 
@@ -416,8 +481,34 @@ export const kanbanRouter = createTRPCRouter({
 
       const profileMap = new Map((profiles ?? []).map((p) => [p.id, p]));
 
+      const { data: contributions, error: contribErr } = await ctx.supabase
+        .from("contributions")
+        .select("id, event_id, user_id, description, changes, challenges")
+        .eq("event_id", input.eventId)
+        .in("user_id", userIds) as unknown as {
+          data: Array<{
+            id: string;
+            event_id: string | null;
+            user_id: string;
+            description: string | null;
+            changes: string | null;
+            challenges: string | null;
+          }> | null;
+          error: { message: string } | null;
+        };
+
+      if (contribErr) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: contribErr.message });
+
+      const contributionByEventUser = new Map(
+        (contributions ?? []).map((contribution) => [
+          `${contribution.event_id}:${contribution.user_id}`,
+          contribution,
+        ])
+      );
+
       const tasks = (members ?? []).map((m) => {
         const profile = profileMap.get(m.user_id);
+        const contribution = contributionByEventUser.get(`${input.eventId}:${m.user_id}`) ?? null;
         return {
           id: m.id,
           name: m.task ?? "",
@@ -426,8 +517,11 @@ export const kanbanRouter = createTRPCRouter({
           assigneeId: m.user_id,
           assigneeName: profile?.name ?? "Unknown",
           assigneeAvatar: profile?.avatar_url ?? null,
-          description: m.description,
-          outcome: m.outcome,
+          contributionId: contribution?.id ?? null,
+          description: contribution?.description ?? null,
+          outcome: m.outcome ?? null,
+          changes: contribution?.changes ?? null,
+          challengesFaced: contribution?.challenges ?? null,
           priority: (m.priority ?? "medium") as "low" | "medium" | "high",
           deadline: m.deadline,
         };
@@ -448,6 +542,41 @@ export const kanbanRouter = createTRPCRouter({
         .eq("id", input.eventMemberId)
         .select()
         .single();
+      if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+      return data;
+    }),
+
+  // -- ADMIN: Save contribution details from task detail drawer
+  adminSaveContribution: adminProcedure
+    .input(
+      z.object({
+        contributionId: z.string().uuid(),
+        description: z.string().max(200).optional(),
+        outcome: z.string().max(500).optional(),
+        changes: z.string().max(200).optional(),
+        challengesFaced: z.string().max(200).optional(),
+        priority: z.enum(["low", "medium", "high"]).optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const { contributionId, ...fields } = input;
+      const updatePayload: Record<string, string | undefined> = {};
+
+      if (fields.description !== undefined) updatePayload.description = fields.description;
+      if (fields.outcome !== undefined) updatePayload.outcome = fields.outcome;
+      if (fields.changes !== undefined) updatePayload.changes = fields.changes;
+      if (fields.challengesFaced !== undefined) {
+        updatePayload.challenges_faced = fields.challengesFaced;
+      }
+      if (fields.priority !== undefined) updatePayload.priority = fields.priority;
+
+      const { data, error } = await ctx.supabase
+        .from("contributions")
+        .update(updatePayload)
+        .eq("id", contributionId)
+        .select()
+        .single();
+
       if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
       return data;
     }),

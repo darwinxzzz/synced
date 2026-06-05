@@ -14,6 +14,10 @@ export interface KanbanTask {
   deadline: Date | null;
   assignedBy: string;
   contributionId: string | null;
+  description: string;
+  outcome: string;
+  changes: string;
+  challengesFaced: string;
   isEditable: boolean;
 }
 

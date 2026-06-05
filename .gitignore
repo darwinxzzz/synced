@@ -35,6 +35,14 @@ yarn-error.log*
 # do not commit any .env files to git, except for the .env.example file. https://create.t3.gg/en/usage/env-variables#using-environment-variables
 .env
 .env*.local
+.env.test
+
+# playwright
+tests/e2e/.auth/
+playwright-report/
+test-results/
+tests/e2e/screenshots/
+.playwright-mcp/
 
 # vercel
 .vercel
@@ -54,3 +62,7 @@ graphify-out/
 
 # claude-flow
 .claude/checkpoints.log
+
+# python
+__pycache__/
+*.pyc

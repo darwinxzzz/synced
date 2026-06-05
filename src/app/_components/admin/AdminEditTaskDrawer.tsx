@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { api } from "~/trpc/react";
 import { SlideDrawer } from "~/app/_components/shared/SlideDrawer";
 import { DeadlinePicker } from "~/app/_components/shared/DeadlinePicker";
+import { ConfirmSaveBar } from "~/app/_components/shared/ConfirmSaveBar";
 import type { AdminTask } from "./AdminTaskCard";
 
 interface AdminEditTaskDrawerProps {
@@ -71,6 +72,7 @@ export function AdminEditTaskDrawer({ open, task, eventId, onClose, onSuccess }:
   const [priority, setPriority] = useState<Priority>("medium");
   const [deadline, setDeadline] = useState("");
   const [saving, setSaving] = useState(false);
+  const [confirming, setConfirming] = useState(false);
 
   const utils = api.useUtils();
   const { data: departments = [] } = api.kanban.getDepartments.useQuery(undefined, { enabled: open });
@@ -95,8 +97,9 @@ export function AdminEditTaskDrawer({ open, task, eventId, onClose, onSuccess }:
       setOutcome(task.outcome ?? "");
       setPriority(task.priority ?? "medium");
       setDeadline(task.deadline ?? "");
+      setConfirming(false);
     }
-  }, [task?.id]);
+  }, [task]);
 
   const handleSave = () => {
     if (!task) return;
@@ -117,7 +120,7 @@ export function AdminEditTaskDrawer({ open, task, eventId, onClose, onSuccess }:
   const footer = (
     <div style={{ display: "flex", gap: "10px" }}>
       <button
-        onClick={handleSave}
+        onClick={() => setConfirming(true)}
         disabled={saving}
         style={{
           flex: 1, height: "44px", borderRadius: "12px", border: "none",
@@ -258,6 +261,13 @@ export function AdminEditTaskDrawer({ open, task, eventId, onClose, onSuccess }:
               Assigned to: <strong style={{ color: "var(--charcoal-ink)" }}>{task.assigneeName}</strong>
             </p>
           </div>
+          {confirming && (
+            <ConfirmSaveBar
+              loading={saving}
+              onConfirm={handleSave}
+              onCancel={() => setConfirming(false)}
+            />
+          )}
         </div>
       )}
     </SlideDrawer>

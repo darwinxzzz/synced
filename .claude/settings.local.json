@@ -29,7 +29,15 @@
       "Bash(python3 *)",
       "Bash(xargs grep *)",
       "Bash(npx knip *)",
-      "Bash(npx ts-prune *)"
+      "Bash(npx ts-prune *)",
+      "Bash(npm view *)",
+      "Bash(claude plugins *)",
+      "Bash(pnpm install *)",
+      "Bash(npx playwright *)",
+      "Bash(pnpm e2e:member)",
+      "Bash(pnpm e2e:setup:admin)",
+      "Bash(pnpm e2e:admin)",
+      "Bash(pnpm e2e:audit)"
     ]
   },
   "enableAllProjectMcpServers": true,

@@ -10,8 +10,11 @@ export interface AdminTask {
   assigneeId: string;
   assigneeName: string;
   assigneeAvatar: string | null;
+  contributionId: string | null;
   description: string | null;
   outcome: string | null;
+  changes: string | null;
+  challengesFaced: string | null;
   priority: "low" | "medium" | "high";
   deadline: string | null;
 }

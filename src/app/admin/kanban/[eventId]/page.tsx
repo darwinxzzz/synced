@@ -55,15 +55,23 @@ export default function AdminOpenBoardPage() {
         if (!old) return old;
         return { ...old, tasks: applyAdminOptimisticMove(old.tasks, eventMemberId, newStatus) };
       });
-      return { prev };
+      return { prev, eventId };
     },
     onError: (err, _vars, ctx) => {
-      if (ctx?.prev) utils.kanban.getOpenBoard.setData({ eventId }, ctx.prev);
+      if (ctx?.prev) utils.kanban.getOpenBoard.setData({ eventId: ctx.eventId }, ctx.prev);
       toast.error(err.message);
     },
-    onSettled: () => {
+    onSettled: (_d, _e, _v, ctx) => {
+      if (ctx?.eventId) void utils.kanban.getOpenBoard.invalidate({ eventId: ctx.eventId });
+    },
+  });
+
+  const adminSaveContribution = api.kanban.adminSaveContribution.useMutation({
+    onSuccess: () => {
+      toast.success("Contribution saved");
       void utils.kanban.getOpenBoard.invalidate({ eventId });
     },
+    onError: (err) => toast.error(err.message),
   });
 
   // Realtime subscription
@@ -129,10 +137,27 @@ export default function AdminOpenBoardPage() {
       pillarStatus: task.pillarStatus,
       deadline: task.deadline ? new Date(task.deadline) : null,
       assignedBy: task.assigneeName,
-      contributionId: null,
-      isEditable: task.pillarStatus !== "done",
+      contributionId: task.contributionId ?? null,
+      description: task.description ?? "",
+      outcome: task.outcome ?? "",
+      changes: task.changes ?? "",
+      challengesFaced: task.challengesFaced ?? "",
+      isEditable: true,
     };
     setDetailTask(kanbanTask);
+  };
+
+  const handleSaveContribution = async (
+    data: Parameters<NonNullable<React.ComponentProps<typeof TaskDetailDrawer>["onSave"]>>[0]
+  ) => {
+    await adminSaveContribution.mutateAsync({
+      contributionId: data.contributionId,
+      description: data.description,
+      outcome: data.outcome,
+      changes: data.changes,
+      challengesFaced: data.challengesFaced,
+      priority: data.priority,
+    });
   };
 
   const scrollToPillar = (status: PillarStatus) => {
@@ -546,6 +571,7 @@ export default function AdminOpenBoardPage() {
         open={!!detailTask}
         task={detailTask}
         onClose={() => setDetailTask(null)}
+        onSave={handleSaveContribution}
       />
 
       <AdminEditTaskDrawer
