@@ -5,8 +5,10 @@ import type { ReflectionItem } from "~/app/_components/shared/ReflectionDetailMo
 interface ContributionEntry {
   id: string;
   title: string;
+  role?: string | null;
   date: string | null;
   description?: string | null;
+  contributionCount?: number;
   reflection: ReflectionItem | null;
 }
 
@@ -15,56 +17,145 @@ interface ContributionTimelineProps {
   onSelectReflection: (reflection: ReflectionItem) => void;
 }
 
-export function ContributionTimeline({ entries, onSelectReflection }: ContributionTimelineProps) {
+export function ContributionTimeline({
+  entries,
+  onSelectReflection,
+}: ContributionTimelineProps) {
   if (entries.length === 0) return null;
 
   return (
     <div>
-      <span className="bamboo-label" style={{ marginBottom: "28px", display: "block" }}>
+      <span
+        className="bamboo-label"
+        style={{ marginBottom: "28px", display: "block" }}
+      >
         Contribution History
       </span>
       <div style={{ display: "flex", flexDirection: "column", gap: "0" }}>
         {entries.map((entry, idx) => {
-          const dateStr = entry.date
-            ? new Date(entry.date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
+          const monthYear = entry.date
+            ? new Date(entry.date).toLocaleDateString("en-GB", {
+                month: "short",
+                year: "numeric",
+              })
             : "—";
           const isLast = idx === entries.length - 1;
           const hasReflection = !!entry.reflection;
+          const countLabel =
+            entry.contributionCount != null
+              ? `${entry.contributionCount} CONTRIBUTION${entry.contributionCount !== 1 ? "S" : ""}`
+              : null;
+          const header = entry.role
+            ? `${entry.title} (${entry.role})`
+            : entry.title;
 
           return (
-            <div key={entry.id} style={{ display: "flex", gap: "0", alignItems: "stretch" }}>
-              {/* Date */}
-              <div style={{ width: "100px", flexShrink: 0, paddingTop: "4px", paddingRight: "16px", textAlign: "right" }}>
-                <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "11px", color: "var(--stone-grey)" }}>
-                  {dateStr}
+            <div
+              key={entry.id}
+              style={{
+                display: "grid",
+                gridTemplateColumns: "140px 1fr",
+                gap: "0 32px",
+                paddingBottom: isLast ? "0" : "40px",
+              }}
+            >
+              {/* Left: date + count */}
+              <div style={{ paddingTop: "2px" }}>
+                <span
+                  style={{
+                    fontFamily: "'Playfair Display', serif",
+                    fontSize: "14px",
+                    fontStyle: "italic",
+                    fontWeight: 600,
+                    color: "var(--deep-forest)",
+                    display: "block",
+                    lineHeight: 1.3,
+                  }}
+                >
+                  {monthYear}
                 </span>
-              </div>
-
-              {/* Timeline dot + line */}
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: "20px", flexShrink: 0 }}>
-                <div style={{ width: "10px", height: "10px", borderRadius: "50%", background: "var(--bamboo-green)", flexShrink: 0, marginTop: "4px" }} />
-                {!isLast && (
-                  <div style={{ width: "2px", flex: 1, background: "var(--bamboo-green)", opacity: 0.25, minHeight: "24px" }} />
+                {countLabel && (
+                  <span
+                    style={{
+                      fontFamily: "'DM Sans', sans-serif",
+                      fontSize: "10px",
+                      fontWeight: 700,
+                      letterSpacing: "0.08em",
+                      textTransform: "uppercase",
+                      color: "var(--stone-grey)",
+                      marginTop: "4px",
+                      display: "block",
+                    }}
+                  >
+                    {countLabel}
+                  </span>
                 )}
               </div>
 
-              {/* Content */}
-              <div style={{ flex: 1, paddingLeft: "16px", paddingBottom: isLast ? "0" : "28px", paddingTop: "2px" }}>
+              {/* Right: title + description */}
+              <div>
                 <button
-                  onClick={() => { if (hasReflection) onSelectReflection(entry.reflection!); }}
-                  aria-label={hasReflection ? `View reflection for ${entry.title}` : entry.title}
-                  style={{ background: "none", border: "none", padding: "0", textAlign: "left", cursor: hasReflection ? "pointer" : "default", width: "100%" }}
+                  onClick={() => {
+                    if (hasReflection) onSelectReflection(entry.reflection!);
+                  }}
+                  aria-label={
+                    hasReflection
+                      ? `View reflection for ${entry.title}`
+                      : entry.title
+                  }
+                  style={{
+                    background: "none",
+                    border: "none",
+                    padding: "0",
+                    textAlign: "left",
+                    cursor: hasReflection ? "pointer" : "default",
+                    width: "100%",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "6px",
+                  }}
                 >
-                  <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "14px", fontWeight: 600, color: hasReflection ? "var(--bamboo-green)" : "var(--charcoal-ink)", marginBottom: "4px", textDecoration: hasReflection ? "underline" : "none", textDecorationColor: "rgba(74,124,89,0.4)" }}>
-                    {entry.title}
+                  <p
+                    style={{
+                      fontFamily: "'DM Sans', sans-serif",
+                      fontSize: "15px",
+                      fontWeight: 700,
+                      color: hasReflection
+                        ? "var(--bamboo-green)"
+                        : "var(--charcoal-ink)",
+                      margin: 0,
+                      lineHeight: 1.35,
+                      textDecoration: hasReflection ? "underline" : "none",
+                      textDecorationColor: "rgba(74,124,89,0.35)",
+                      textUnderlineOffset: "2px",
+                    }}
+                  >
+                    {header}
                     {hasReflection && (
-                      <span style={{ marginLeft: "6px", fontSize: "11px", fontWeight: 400, color: "var(--stone-grey)" }}>
-                        (view reflection)
+                      <span
+                        style={{
+                          marginLeft: "8px",
+                          fontSize: "11px",
+                          fontWeight: 400,
+                          color: "var(--stone-grey)",
+                          fontStyle: "italic",
+                          textDecoration: "none",
+                        }}
+                      >
+                        view reflection ↗
                       </span>
                     )}
                   </p>
                   {entry.description && (
-                    <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "13px", color: "var(--stone-grey)", lineHeight: 1.6 }}>
+                    <p
+                      style={{
+                        fontFamily: "'DM Sans', sans-serif",
+                        fontSize: "13px",
+                        color: "var(--stone-grey)",
+                        lineHeight: 1.7,
+                        margin: 0,
+                      }}
+                    >
                       {entry.description}
                     </p>
                   )}
