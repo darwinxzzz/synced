@@ -1,6 +1,19 @@
 # Event Sync
 
+![Next.js](https://img.shields.io/badge/Next.js_15-black?style=flat-square&logo=next.js)
+![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=white)
+![Supabase](https://img.shields.io/badge/Supabase-3ECF8E?style=flat-square&logo=supabase&logoColor=white)
+![tRPC](https://img.shields.io/badge/tRPC-2596BE?style=flat-square&logo=trpc&logoColor=white)
+![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS_v4-06B6D4?style=flat-square&logo=tailwindcss&logoColor=white)
+![Vercel](https://img.shields.io/badge/Vercel-black?style=flat-square&logo=vercel)
+![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)
+
 A production-ready community event tracking platform built with the T3 stack. Two user roles - Admin (Exco) and Member - with distinct views, permissions, and interactions. Visual theme inspired by the Arashiyama Bamboo Grove, Kyoto.
+
+## Screenshots
+
+> Add a screenshot of the app here. Place the image at `public/screenshot.png` and uncomment the line below.
+<!-- ![EventSync Dashboard](public/screenshot.png) -->
 
 ## Tech Stack
 
@@ -170,6 +183,20 @@ Open `http://localhost:3000`.
 For the full EventSync-specific Supabase snapshot (tables, functions, policy inventory), see:
 
 - `supabase/EVENTSYNC_SUPABASE_REFERENCE.md`
+
+## Key Engineering Decisions
+
+### Row-Level Security over application-layer guards
+Enforcing access control at the Postgres RLS layer rather than in API code means the policy travels with the data — a missed guard in a new endpoint can't accidentally expose rows. Every domain table has RLS enabled; admin checks read from `public.is_admin()` in the DB rather than trusting JWT metadata that could be spoofed.
+
+### tRPC for end-to-end type safety
+Replacing a REST layer with tRPC means the TypeScript types for every procedure input and output are inferred automatically. No more hand-maintaining OpenAPI specs or casting `unknown` response bodies — a schema change propagates a compiler error across the full stack.
+
+### AI quota reservation before provider call
+The `reserveAiQuota` → provider call → `logAiUsage` pattern (see `src/server/ai/guard.ts`) prevents runaway AI spend. Quota is consumed atomically before the expensive call; if the call fails, the log records the miss. Per-user daily limits live in `ai_usage_limits` and are checked server-side, never client-side.
+
+### Optimistic UI with server reconciliation
+Kanban and attendance UIs apply state changes locally before the tRPC mutation resolves, then reconcile with the server response. This removes perceived latency on slow connections without sacrificing correctness — the server response is still the source of truth.
 
 ## Security Notes
 

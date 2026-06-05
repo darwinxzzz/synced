@@ -63,6 +63,12 @@ graphify-out/
 # claude-flow
 .claude/checkpoints.log
 
+# personal AI tool configs — not part of the project
+.claude/
+.claude-flow/
+.agents/
+AGENTS.md
+
 # python
 __pycache__/
 *.pyc
