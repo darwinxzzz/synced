@@ -45,7 +45,7 @@ export default function MemberLayout({ children }: { children: React.ReactNode }
           className="text-lg font-semibold shrink-0 flex items-center gap-2"
           style={{ color: "var(--deep-forest)", fontFamily: "'Playfair Display', serif" }}
         >
-          🎋 Event Sync
+          Synced
         </Link>
 
         {/* Desktop nav links */}

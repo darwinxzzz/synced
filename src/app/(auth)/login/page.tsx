@@ -174,7 +174,7 @@ function AuthSurface() {
 
   async function redirectAfterLogin(supabase: ReturnType<typeof createClient>, userId: string) {
     const { data: profile } = await supabase.from("profiles").select("role, status").eq("id", userId).single()
-    if (!profile) { await supabase.auth.signOut(); toast.error("You have not been added to Event Sync. Contact your admin."); return }
+    if (!profile) { await supabase.auth.signOut(); toast.error("You have not been added to Synced. Contact your admin."); return }
     //if (profile.status === "pending") { await supabase.auth.signOut(); toast.error("Your account is pending admin approval"); return }
     if (profile.status === "rejected" || profile.status === "inactive"|| profile.status === "pending") { await supabase.auth.signOut(); toast.error("Your account has not been approved."); return }
     if (profile.status !== "active") { await supabase.auth.signOut(); toast.error("Your account is pending admin approval"); return }
@@ -409,7 +409,7 @@ function AuthSurface() {
                             onFocus={() => setFocusedField("login-email")}
                             onBlur={() => setFocusedField(null)}
                             required
-                            placeholder="name@eventsync.com"
+                            placeholder="name@synced.com"
                             className="h-14 rounded-full border-0 bg-[#ddd8d0] px-6 text-[#1d1c17] shadow-none placeholder:text-[#a9afaa] focus-visible:ring-0"
                           />
                         </InputWrapper>
@@ -522,7 +522,7 @@ function AuthSurface() {
               <div className="grid h-full grid-cols-1 lg:grid-cols-[1fr_1.35fr]">
                 <aside className="hidden h-full bg-[#123f2d] p-10 text-[#e8efe9] lg:flex lg:flex-col lg:justify-between">
                   <div>
-                    <p className="text-sm uppercase tracking-[0.18em] text-[#9ec0ad]">Event Sync</p>
+                    <p className="text-sm uppercase tracking-[0.18em] text-[#9ec0ad]">Synced</p>
                     <h2 className="font-headline mt-8 text-6xl leading-[1.05] tracking-tight">
                       {view === "enroll" ? "Secure Your Account" : "The Path to Alignment Begins Here"}
                     </h2>
@@ -613,7 +613,7 @@ function AuthSurface() {
 }
 
 function getUrlErrorMessage(urlError: string) {
-  if (urlError === "not_registered") return "You have not been added to Event Sync. Contact your admin."
+  if (urlError === "not_registered") return "You have not been added to Synced. Contact your admin."
   if (urlError === "pending_approval") return "Your account is pending admin approval"
   if (urlError === "access_rejected") return "Your account has not been approved. Contact an admin."
   if (urlError === "auth_failed") return "Authentication failed. Please try again."

@@ -34,7 +34,7 @@ export function Navbar() {
                 whiteSpace: "nowrap",
               }}
             >
-              Event Sync
+              Synced
             </span>
           </div>
 

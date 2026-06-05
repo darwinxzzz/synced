@@ -11,7 +11,7 @@ import { api } from "~/trpc/react";
 // ── Testimonials data ────────────────────────────────────────────────────────
 const TESTIMONIALS = [
   {
-    quote: "Event Sync transformed how our chapter tracks progress. The calm, intentional design keeps everyone focused.",
+    quote: "Synced transformed how our chapter tracks progress. The calm, intentional design keeps everyone focused.",
     author: "Amara Chen",
     city: "San Francisco",
     service: "Admin Dashboard",
@@ -39,7 +39,7 @@ const TESTIMONIALS = [
     stars: 5,
   },
   {
-    quote: "Our exco team cut planning meetings in half because everyone checks Event Sync first.",
+    quote: "Our exco team cut planning meetings in half because everyone checks Synced first.",
     author: "Keiko Tanaka",
     city: "Tokyo",
     service: "Admin Dashboard",
@@ -60,7 +60,7 @@ const TESTIMONIALS = [
     stars: 5,
   },
   {
-    quote: "Progress tracking used to be a spreadsheet nightmare. Event Sync made it almost meditative.",
+    quote: "Progress tracking used to be a spreadsheet nightmare. Synced made it almost meditative.",
     author: "Zara Khan",
     city: "Karachi",
     service: "Attendance Tracker",
@@ -167,7 +167,7 @@ function NewsletterSection() {
           Stay in the loop
         </p>
         <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: "clamp(28px, 4vw, 40px)", fontWeight: 600, color: "var(--ivory-paper)", lineHeight: 1.2, marginBottom: "12px" }}>
-          Join The Sync Newsletter
+          Join the Synced Newsletter
         </h2>
         <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "18px", color: "var(--stone-grey)", lineHeight: 1.6, marginBottom: "32px" }}>
           Monthly insights on community event management, product updates, and wabi-sabi leadership.
@@ -178,7 +178,7 @@ function NewsletterSection() {
               <CheckCircle2 size={32} color="var(--bamboo-green)" />
             </div>
             <p style={{ fontFamily: "'Playfair Display', serif", fontSize: "22px", color: "var(--ivory-paper)" }}>
-              You&apos;re in! Welcome to The Sync.
+              You&apos;re in! Welcome to Synced.
             </p>
           </div>
         ) : (
@@ -264,7 +264,7 @@ export default function Landing() {
             className="animate-blur-in"
             style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "18px", color: "rgba(245,240,232,0.82)", lineHeight: 1.65, marginBottom: "40px", animationDelay: "0.6s", opacity: 0 }}
           >
-            Event Sync brings calm clarity to community event management. Admins and members always know exactly where they stand — in one beautifully simple dashboard.
+            Synced brings calm clarity to community event management. Admins and members always know exactly where they stand in one beautifully simple dashboard.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 animate-blur-in" style={{ animationDelay: "0.8s", opacity: 0 }}>
             <button

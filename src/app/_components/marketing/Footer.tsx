@@ -33,7 +33,7 @@ export function Footer() {
           whiteSpace: "nowrap",
         }}
       >
-        EventSync
+        Synced
       </div>
 
       <div className="relative max-w-7xl mx-auto px-6 lg:px-8 pt-24 pb-8">
@@ -51,7 +51,7 @@ export function Footer() {
                   color: "var(--ivory-paper)",
                 }}
               >
-                Event Sync
+                Synced
               </span>
             </div>
             <p
@@ -149,7 +149,7 @@ export function Footer() {
               color: "var(--stone-grey)",
             }}
           >
-            © 2026 Event Sync. All rights reserved.
+            (c) 2026 Synced. All rights reserved.
           </p>
           <div className="flex gap-6">
             {["Privacy Policy", "Terms", "Cookie Settings"].map((item) => (
