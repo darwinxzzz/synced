@@ -219,13 +219,14 @@ export const testimonialsRouter = createTRPCRouter({
         // TODO: replace with AI-generated summary of what the member did at this event
         // AI input: { eventName: event?.name, role, contributions: contribs.map(c => ({ task: c.task, description: c.description })) }
         // AI output: 1–2 sentence paragraph describing the member's specific contributions
+        const contributionDescription = contribs
+          .map((c) => c.description)
+          .filter(Boolean)
+          .join(" ");
         const description =
-          contribs
-            .map((c) => c.description)
-            .filter(Boolean)
-            .join(" ") ||
-          event?.description ||
-          "";
+          contributionDescription.length > 0
+            ? contributionDescription
+            : (event?.description ?? "");
 
         return {
           id: eventId,
