@@ -69,6 +69,11 @@ graphify-out/
 .agents/
 AGENTS.md
 
+# design tool outputs — not part of the project
+designs/
+.stitch/
+.codex/
+
 # python
 __pycache__/
 *.pyc
