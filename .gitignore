@@ -12,6 +12,8 @@
 /prisma/db.sqlite
 /prisma/db.sqlite-journal
 db.sqlite
+supabase/.temp/
+supabase/.branches/
 
 # next.js
 /.next/
@@ -52,6 +54,7 @@ tests/e2e/screenshots/
 
 # idea files
 .idea
+.vscode/
 
 # graphify analysis outputs
 .graphify_*.json
