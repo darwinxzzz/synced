@@ -1,44 +1,56 @@
-import { createServerClient } from '@supabase/ssr'
-import { type NextRequest, NextResponse } from 'next/server'
+import { createServerClient } from "@supabase/ssr";
+import { type NextRequest, NextResponse } from "next/server";
+import { evaluateAccess } from "~/lib/auth/access";
+
+// Maps the shared access reason to the login page's existing error query param,
+// so the rule is unified with tRPC while the login UX is unchanged.
+const REASON_TO_LOGIN_ERROR: Record<string, string> = {
+  ACCOUNT_PENDING_APPROVAL: "pending_approval",
+  ACCOUNT_REJECTED: "access_rejected",
+  ACCOUNT_NOT_ACTIVE: "pending_approval",
+};
 
 // In-memory rate limiter
-const rateLimitMap = new Map<string, { count: number; timestamp: number }>()
+const rateLimitMap = new Map<string, { count: number; timestamp: number }>();
 
 function rateLimit(ip: string, limit: number, windowMs: number): boolean {
-  const now = Date.now()
-  const record = rateLimitMap.get(ip)
+  const now = Date.now();
+  const record = rateLimitMap.get(ip);
   if (!record || now - record.timestamp > windowMs) {
-    rateLimitMap.set(ip, { count: 1, timestamp: now })
-    return true
+    rateLimitMap.set(ip, { count: 1, timestamp: now });
+    return true;
   }
-  if (record.count >= limit) return false
-  record.count++
-  return true
+  if (record.count >= limit) return false;
+  record.count++;
+  return true;
 }
 
 export async function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl
-  const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? '127.0.0.1'
+  const { pathname } = request.nextUrl;
+  const ip =
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+    "127.0.0.1";
 
   // Rate limiting
-  const authRoute = pathname.startsWith('/auth') || pathname.startsWith('/login')
-  const trpcRoute = pathname.startsWith('/api/trpc')
+  const authRoute =
+    pathname.startsWith("/auth") || pathname.startsWith("/login");
+  const trpcRoute = pathname.startsWith("/api/trpc");
 
   if (authRoute && !rateLimit(ip, 10, 60_000)) {
-    return new NextResponse('Too many requests', { status: 429 })
+    return new NextResponse("Too many requests", { status: 429 });
   }
   if (trpcRoute && !rateLimit(ip, 100, 60_000)) {
-    return new NextResponse('Too many requests', { status: 429 })
+    return new NextResponse("Too many requests", { status: 429 });
   }
 
   // tRPC handles auth/role checks in createTRPCContext + procedures.
   // Keep middleware rate limiting for /api/trpc, but skip duplicate auth fetch here.
   if (trpcRoute) {
-    return NextResponse.next({ request })
+    return NextResponse.next({ request });
   }
 
   // Supabase session refresh
-  let supabaseResponse = NextResponse.next({ request })
+  let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -46,91 +58,99 @@ export async function middleware(request: NextRequest) {
     {
       cookies: {
         getAll() {
-          return request.cookies.getAll()
+          return request.cookies.getAll();
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
-          supabaseResponse = NextResponse.next({ request })
+          cookiesToSet.forEach(({ name, value }) =>
+            request.cookies.set(name, value),
+          );
+          supabaseResponse = NextResponse.next({ request });
           cookiesToSet.forEach(({ name, value, options }) =>
             supabaseResponse.cookies.set(name, value, options),
-          )
+          );
         },
       },
     },
-  )
+  );
 
   const {
     data: { user },
-  } = await supabase.auth.getUser()
+  } = await supabase.auth.getUser();
 
-  const onProtectedAppRoute = pathname.startsWith('/member') || pathname.startsWith('/admin')
+  const onProtectedAppRoute =
+    pathname.startsWith("/member") || pathname.startsWith("/admin");
 
   const redirectToLogin = (error?: string) => {
-    const url = request.nextUrl.clone()
-    url.pathname = '/login'
+    const url = request.nextUrl.clone();
+    url.pathname = "/login";
     if (error) {
-      url.searchParams.set('error', error)
+      url.searchParams.set("error", error);
     }
-    return NextResponse.redirect(url)
-  }
+    return NextResponse.redirect(url);
+  };
 
   // Auth guards
-  if (!user && onProtectedAppRoute) {    //using middleware function through next.js cause referring to supabase to authenticate whether admin
-    return redirectToLogin()
+  if (!user && onProtectedAppRoute) {
+    //using middleware function through next.js cause referring to supabase to authenticate whether admin
+    return redirectToLogin();
   }
 
-  if (user && (onProtectedAppRoute || pathname === '/login')) {
+  if (user && (onProtectedAppRoute || pathname === "/login")) {
     const { data: profile } = await supabase
-      .from('profiles')
-      .select('role, status')
-      .eq('id', user.id)
-      .single()
+      .from("profiles")
+      .select("role, status")
+      .eq("id", user.id)
+      .single();
 
     if (!profile) {
-      await supabase.auth.signOut()
-      return redirectToLogin('not_registered')
+      await supabase.auth.signOut();
+      return redirectToLogin("not_registered");
     }
 
-    if (profile.status === 'pending') {
-      await supabase.auth.signOut()
-      return redirectToLogin('pending_approval')
-    }
+    // Same rule as tRPC's protectedProcedure — see lib/auth/access.ts.
+    const decision = evaluateAccess(profile);
 
-    if (profile.status === 'rejected' || profile.status === 'inactive') {
-      await supabase.auth.signOut()
-      return redirectToLogin('access_rejected')
-    }
-
-    if (profile.status !== 'active') {
-      await supabase.auth.signOut()
-      return redirectToLogin('pending_approval')
+    if (!decision.ok) {
+      await supabase.auth.signOut();
+      return redirectToLogin(
+        REASON_TO_LOGIN_ERROR[decision.reason] ?? "pending_approval",
+      );
     }
 
     if (onProtectedAppRoute) {
       // Block members from /admin/* and admins from /member/*
-      if (pathname.startsWith('/admin') && profile.role !== 'admin') {
-        const url = request.nextUrl.clone()
-        url.pathname = '/member/dashboard'
-        return NextResponse.redirect(url)
+      if (pathname.startsWith("/admin") && decision.role !== "admin") {
+        const url = request.nextUrl.clone();
+        url.pathname = "/member/dashboard";
+        return NextResponse.redirect(url);
       }
-      if (pathname.startsWith('/member') && profile.role !== 'member') {
-        const url = request.nextUrl.clone()
-        url.pathname = '/admin/dashboard'
-        return NextResponse.redirect(url)
+      if (pathname.startsWith("/member") && decision.role !== "member") {
+        const url = request.nextUrl.clone();
+        url.pathname = "/admin/dashboard";
+        return NextResponse.redirect(url);
       }
-      return supabaseResponse
+      return supabaseResponse;
     }
 
     // Post-login redirect: route by role
-    const dest = profile.role === 'admin' ? '/admin/dashboard' : '/member/dashboard'
-    const url = request.nextUrl.clone()
-    url.pathname = dest
-    return NextResponse.redirect(url)
+    const dest =
+      decision.role === "admin" ? "/admin/dashboard" : "/member/dashboard";
+    const url = request.nextUrl.clone();
+    url.pathname = dest;
+    return NextResponse.redirect(url);
   }
 
-  return supabaseResponse
+  return supabaseResponse;
 }
 
 export const config = {
-  matcher: ['/member/:path*', '/admin/:path*', '/login', '/auth/:path*', '/api/trpc/:path*'],
-}
+  matcher: [
+    "/member/:path*",
+    "/admin/:path*",
+    "/login",
+    "/auth/:path*",
+    "/api/trpc/:path*",
+  ],
+};
+
+

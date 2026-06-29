@@ -2,15 +2,13 @@ import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import { ZodError } from "zod";
 import { createClient } from "~/lib/supabase/server";
- 
+import { evaluateAccess, getAuthState, type UserRole } from "~/lib/auth/access";
+
 export const createTRPCContext = async (opts: { headers: Headers }) => {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
 
-  // Fetch profile once here — procedures read ctx.profile instead of re-querying
-  const profile = user
-    ? (await supabase.from("profiles").select("role, status").eq("id", user.id).single()).data
-    : null;
+  // user + profile derived once, the same way the server route guards do it.
+  const { user, profile } = await getAuthState(supabase);
 
   return {
     supabase,
@@ -20,7 +18,8 @@ export const createTRPCContext = async (opts: { headers: Headers }) => {
   };
 };
 
-const t = initTRPC.context<typeof createTRPCContext>().create({  //TRPC is not middlewar.
+const t = initTRPC.context<typeof createTRPCContext>().create({
+  //TRPC is not middlewar.
   transformer: superjson,
   errorFormatter({ shape, error }) {
     return {
@@ -57,56 +56,33 @@ const timingMiddleware = t.middleware(async ({ next, path }) => {
 
 export const publicProcedure = t.procedure.use(timingMiddleware);
 
+/**
+ * Shared gate for authenticated procedures. The status/role rule lives in one place
+ * (evaluateAccess) so it cannot drift between tRPC and the edge/server guards.
+ */
+const enforceAccess = (requireRole?: UserRole) =>
+  t.middleware(async ({ ctx, next }) => {
+    const decision = evaluateAccess(
+      ctx.profile,
+      requireRole ? { requireRole } : {},
+    );
+
+    if (!decision.ok) {
+      throw new TRPCError({
+        code:
+          decision.code === "UNAUTHENTICATED" ? "UNAUTHORIZED" : "FORBIDDEN",
+        message: decision.reason,
+      });
+    }
+
+    // decision.ok guarantees an active, authenticated user.
+    return next({ ctx: { ...ctx, user: ctx.user! } });
+  });
+
 export const protectedProcedure = t.procedure
   .use(timingMiddleware)
-  .use(async ({ ctx, next }) => {
-    if (!ctx.user || !ctx.profile) {
-      throw new TRPCError({ code: "UNAUTHORIZED" });
-    }
-
-    const { profile } = ctx;
-
-    if (profile.status === "pending") {
-      throw new TRPCError({ code: "FORBIDDEN", message: "ACCOUNT_PENDING_APPROVAL" });
-    }
-
-    if (profile.status === "rejected" || profile.status === "inactive") {
-      throw new TRPCError({ code: "FORBIDDEN", message: "ACCOUNT_REJECTED" });
-    }
-
-    if (profile.status !== "active") {
-      throw new TRPCError({ code: "FORBIDDEN", message: "ACCOUNT_NOT_ACTIVE" });
-    }
-
-    return next({
-      ctx: {
-        ...ctx,
-        user: ctx.user,
-      },
-    });
-  });
+  .use(enforceAccess());
 
 export const adminProcedure = t.procedure
   .use(timingMiddleware)
-  .use(async ({ ctx, next }) => {
-    if (!ctx.user || !ctx.profile) {
-      throw new TRPCError({ code: "UNAUTHORIZED" });
-    }
-
-    const { profile } = ctx;
-
-    if (profile.status !== "active") {
-      throw new TRPCError({ code: "FORBIDDEN", message: "ACCOUNT_NOT_ACTIVE" });
-    }
-
-    if (profile.role !== "admin") {
-      throw new TRPCError({ code: "FORBIDDEN", message: "ADMIN_REQUIRED" });
-    }
-
-    return next({
-      ctx: {
-        ...ctx,
-        user: ctx.user,
-      },
-    });
-  });
+  .use(enforceAccess("admin"));
