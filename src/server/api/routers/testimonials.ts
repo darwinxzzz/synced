@@ -5,6 +5,15 @@ import {
   adminProcedure,
   protectedProcedure,
 } from "~/server/api/trpc";
+import {
+  finaliseTestimonialInput,
+  updateTestimonialInput,
+} from "~/server/services/testimonials/schemas";
+import {
+  finaliseTestimonial,
+  requestTestimonial,
+  updateTestimonial,
+} from "~/server/services/testimonials/testimonial.service";
 
 export const testimonialsRouter = createTRPCRouter({
   getMemberTestimonial: protectedProcedure
@@ -329,21 +338,9 @@ export const testimonialsRouter = createTRPCRouter({
       };
     }),
 
-  requestTestimonial: protectedProcedure.mutation(async ({ ctx }) => {
-    const { error } = await ctx.supabase
-      .from("testimonial_requests")
-      .upsert(
-        { user_id: ctx.user.id, status: "pending" },
-        { onConflict: "user_id" },
-      );
-
-    if (error)
-      throw new TRPCError({
-        code: "INTERNAL_SERVER_ERROR",
-        message: error.message,
-      });
-    return { success: true };
-  }),
+  requestTestimonial: protectedProcedure.mutation(({ ctx }) =>
+    requestTestimonial(ctx.supabase, ctx.user.id),
+  ),
 
   getTestimonialRequests: adminProcedure.query(async ({ ctx }) => {
     const { data, error } = await ctx.supabase
@@ -642,111 +639,12 @@ export const testimonialsRouter = createTRPCRouter({
     }),
 
   updateTestimonial: adminProcedure
-    .input(
-      z.object({
-        testimonialId: z.string().uuid(),
-        endorsementQuote: z.string().optional(),
-        endorsementName: z.string().optional(),
-        endorsementTitle: z.string().optional(),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      const { testimonialId, ...fields } = input;
-      const updates: Record<string, string> = {};
-      if (fields.endorsementQuote !== undefined)
-        updates.endorsement_quote = fields.endorsementQuote;
-      if (fields.endorsementName !== undefined)
-        updates.endorsement_name = fields.endorsementName;
-      if (fields.endorsementTitle !== undefined)
-        updates.endorsement_title = fields.endorsementTitle;
-
-      const { error } = await ctx.supabase
-        .from("testimonials")
-        .update(updates)
-        .eq("id", testimonialId);
-
-      if (error)
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: error.message,
-        });
-      return { success: true };
-    }),
+    .input(updateTestimonialInput)
+    .mutation(({ ctx, input }) => updateTestimonial(ctx.supabase, input)),
 
   finaliseTestimonial: adminProcedure
-    .input(
-      z.object({
-        memberId: z.string().uuid(),
-        endorsementQuote: z.string().min(1),
-        endorsementName: z.string().optional(),
-        endorsementTitle: z.string().optional(),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      const { data: adminProfile } = await ctx.supabase
-        .from("profiles")
-        .select("name, department")
-        .eq("id", ctx.user.id)
-        .single();
-
-      if (!adminProfile) {
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: "Admin profile not found",
-        });
-      }
-
-      const { data: existing } = await ctx.supabase
-        .from("testimonials")
-        .select("id")
-        .eq("user_id", input.memberId)
-        .maybeSingle();
-
-      const requestedName = input.endorsementName?.trim();
-      const requestedTitle = input.endorsementTitle?.trim();
-
-      const testimonialPayload = {
-        endorsement_quote: input.endorsementQuote,
-        endorsement_name:
-          requestedName && requestedName.length > 0
-            ? requestedName
-            : adminProfile.name,
-        endorsement_title:
-          requestedTitle && requestedTitle.length > 0
-            ? requestedTitle
-            : (adminProfile.department ?? "Admin"),
-        finalised_at: new Date().toISOString(),
-      };
-
-      const testimonialQuery = existing
-        ? ctx.supabase
-            .from("testimonials")
-            .update(testimonialPayload)
-            .eq("id", existing.id)
-        : ctx.supabase.from("testimonials").insert({
-            ...testimonialPayload,
-            user_id: input.memberId,
-            generated_by: ctx.user.id,
-          });
-
-      const { error: testimonialError } = await testimonialQuery;
-      if (testimonialError)
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: testimonialError.message,
-        });
-
-      const { error: requestError } = await ctx.supabase
-        .from("testimonial_requests")
-        .update({ status: "sent" })
-        .eq("user_id", input.memberId);
-
-      if (requestError)
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: requestError.message,
-        });
-
-      return { success: true };
-    }),
+    .input(finaliseTestimonialInput)
+    .mutation(({ ctx, input }) =>
+      finaliseTestimonial(ctx.supabase, ctx.user.id, input),
+    ),
 });
