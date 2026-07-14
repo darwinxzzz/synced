@@ -20,6 +20,7 @@
 - [Code Modules](./code/modules.md)
 - [Testing Guide](./testing/)
 - [Deployment Guide](./deployment/)
+- [Third-Party Dependencies](./dependencies.md) — Libraries, hosted services, and repository dependencies
 
 ## For Designers
 

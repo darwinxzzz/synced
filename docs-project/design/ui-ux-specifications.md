@@ -10,11 +10,61 @@
 - Admin and member experiences share patterns but use separate shells and navigation treatments for their roles.
 
 ## Information Architecture
+
+```
+                    ┌───────────────────┐
+                    │   Root Layout     │
+                    │ (providers, font) │
+                    └─────────┬─────────┘
+                              │
+            ┌─────────────────┼─────────────────┐
+            │                 │                  │
+            ▼                 ▼                  ▼
+┌────────────────────┐ ┌──────────────┐ ┌──────────────────┐
+│ (marketing)        │ │  (auth)      │ │  Admin Portal    │
+│ Public Route Group │ │  Route Group │ │  /admin/*        │
+├────────────────────┤ ├──────────────┤ ├──────────────────┤
+│   / landing page   │ │  /login      │ │  /admin/         │
+│   Navbar + Footer  │ │  minimal     │ │  dashboard       │
+│                    │ │  layout      │ │  /admin/         │
+│                    │ │              │ │  attendance      │
+│                    │ │              │ │  /admin/kanban   │
+│                    │ │              │ │  /admin/         │
+│                    │ │              │ │  testimonials    │
+└────────┬───────────┘ └──────────────┘ └──────────────────┘
+         │                                              │
+         │                                              │
+         │              ┌───────────────────────────────┘
+         │              │
+         ▼              ▼
+┌──────────────────┐
+│  Member Portal   │
+│  /member/*       │
+├──────────────────┤
+│  /member/        │
+│  dashboard       │
+│  /member/kanban  │
+│  /member/        │
+│  testimonials    │
+└──────────────────┘
+
+         ┌─────────────────────────────────────────────────┐
+         │           Navigation by Role                     │
+         │  ┌─────────────────┐  ┌──────────────────────┐   │
+         │  │    Desktop      │  │       Mobile         │   │
+         │  │  Sidebar Nav    │  │    Tab Bar           │   │
+         │  │  + Profile      │  │    + Drawer          │   │
+         │  │  Drawer         │  │                      │   │
+         │  └─────────────────┘  └──────────────────────┘   │
+         └─────────────────────────────────────────────────┘
+```
+
+### Summary
 - **Public:** Marketing landing page
 - **Auth:** Login page
 - **Admin:** Dashboard, Attendance, Kanban, Testimonials
 - **Member:** Dashboard, Kanban, Testimonials
-- **Navigation:** Admin/member layouts provide desktop sidebar navigation and a mobile tab bar
+- **Navigation:** Desktop sidebar + mobile tab bar with profile drawer
 
 ## Components
 

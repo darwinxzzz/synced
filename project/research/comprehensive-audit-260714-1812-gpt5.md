@@ -19,13 +19,65 @@ Synced is a role-aware coordination platform for volunteer/community organisatio
 ### Architecture sketch
 
 ```text
-Browser / Server Components
-        -> Next middleware (session refresh, redirects, in-memory rate limit)
-        -> /api/trpc fetch handler
-        -> tRPC context (Supabase SSR client + user/profile lookup)
-        -> public/protected/admin procedures
-        -> Supabase Postgres + RLS
-        -> service-role admin client only in attendance invite flow
+┌─────────────────────────────────────────────────────────────┐
+│                    REQUEST FLOW                              │
+│                                                              │
+│  ┌──────────┐                                                │
+│  │ Browser  │                                                │
+│  └────┬─────┘                                                │
+│       │                                                      │
+│       ▼                                                      │
+│  ┌──────────────────────────────────────────────────────┐    │
+│  │           Next.js Middleware (middleware.ts)          │    │
+│  │  ┌──────────┐ ┌──────────┐ ┌────────────────────┐   │    │
+│  │  │  Session │ │   Rate   │ │  Route Protection  │   │    │
+│  │  │  Refresh │ │  Limit   │ │  + Role Redirect   │   │    │
+│  │  │          │ │  (Map)   │ │                    │   │    │
+│  │  └──────────┘ └──────────┘ └────────────────────┘   │    │
+│  └──────────────────────┬───────────────────────────────┘    │
+│                         │                                    │
+│                         ▼                                    │
+│  ┌──────────────────────────────────────────────────────┐    │
+│  │          tRPC HTTP Handler (/api/trpc)               │    │
+│  └──────────────────────┬───────────────────────────────┘    │
+│                         │                                    │
+│                         ▼                                    │
+│  ┌──────────────────────────────────────────────────────┐    │
+│  │           tRPC Context (createTRPCContext)           │    │
+│  │  ┌────────────────────────────────────────────────┐  │    │
+│  │  │  Creates SSR Supabase client                   │  │    │
+│  │  │  Resolves user+profile via getAuthState()      │  │    │
+│  │  └────────────────────────────────────────────────┘  │    │
+│  └──────────────────────┬───────────────────────────────┘    │
+│                         │                                    │
+│                         ▼                                    │
+│  ┌──────────────────────────────────────────────────────┐    │
+│  │              Procedure Gates                          │    │
+│  │  ┌──────────────┐  ┌──────────────┐  ┌────────────┐ │    │
+│  │  │    Public    │  │  Protected   │  │   Admin    │ │    │
+│  │  └──────────────┘  └──────────────┘  └────────────┘ │    │
+│  └──────────────────────┬───────────────────────────────┘    │
+│                         │                                    │
+│         ┌───────────────┼───────────────────────┐             │
+│         │               │                       │             │
+│         ▼               ▼                       ▼             │
+│  ┌──────────────┐ ┌──────────────┐ ┌─────────────────────┐   │
+│  │   SSR        │ │  Browser    │ │  Service-Role       │   │
+│  │  Supabase    │ │  Supabase   │ │  Admin Client       │   │
+│  │  Client      │ │  Client     │ │  (attendance only)  │   │
+│  └──────┬───────┘ └──────┬──────┘ └──────────┬──────────┘   │
+│         │               │                    │              │
+└─────────┼───────────────┼────────────────────┼──────────────┘
+          │               │                    │
+          ▼               ▼                    ▼
+┌─────────────────────────────────────────────────────────────┐
+│                 Supabase Postgres + RLS                      │
+│  ┌─────────┐ ┌──────────┐ ┌──────────────┐ ┌────────────┐  │
+│  │  Auth   │ │ Profiles │ │ Application  │ │ RLS/       │  │
+│  │(Supabase│ │  Table   │ │   Tables     │ │ Triggers   │  │
+│  │  Auth)  │ │          │ │              │ │            │  │
+│  └─────────┘ └──────────┘ └──────────────┘ └────────────┘  │
+└─────────────────────────────────────────────────────────────┘
 ```
 
 ### Key directories
@@ -58,10 +110,39 @@ The current design is a pragmatic single-application monolith with a managed Pos
 The application currently has four overlapping control/data paths:
 
 ```text
-Browser page -> tRPC -> SSR Supabase client -> Postgres/RLS
-Browser page -> Supabase browser client -> Auth/Realtime/PostgREST/RLS
-Middleware -> SSR Supabase client -> Auth/profile lookup -> redirect
-Admin procedure -> service-role client -> Supabase Auth admin API
+┌──────────────────────────────────────────────────────────────────┐
+│                    FOUR ACCESS PATHS                             │
+│                                                                  │
+│  PATH 1: Application Command (primary)                          │
+│  ┌──────────┐    ┌────────┐    ┌────────┐    ┌──────────────┐   │
+│  │ Browser  │───▶│ tRPC   │───▶│  SSR   │───▶│  Postgres +  │   │
+│  │  Page    │    │ Router │    │Supabase│    │    RLS       │   │
+│  └──────────┘    └────────┘    └────────┘    └──────────────┘   │
+│                                                                  │
+│  PATH 2: Direct Browser Supabase                                │
+│  ┌──────────┐    ┌──────────────────┐    ┌──────────────────┐    │
+│  │ Browser  │───▶│ Supabase Browser │───▶│ Auth / Realtime  │    │
+│  │  Page    │    │     Client       │    │ / PostgREST / RLS│    │
+│  └──────────┘    └──────────────────┘    └──────────────────┘    │
+│                                                                  │
+│  PATH 3: Middleware (edge)                                       │
+│  ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐   │
+│  │ Request  │───▶│Next.js   │───▶│  SSR     │───▶│ Auth /   │   │
+│  │          │    │Middleware│    │Supabase  │    │ Profile  │   │
+│  │          │    │          │    │          │    │ Lookup   │   │
+│  └──────────┘    └──────────┘    └──────────┘    └──────────┘   │
+│                                                    │           │
+│                                                    ▼           │
+│                                               ┌──────────┐     │
+│                                               │ Redirect │     │
+│                                               └──────────┘     │
+│                                                                  │
+│  PATH 4: Admin Service-Role (limited)                           │
+│  ┌──────────┐    ┌──────────┐    ┌─────────────────────────┐    │
+│  │  Admin   │───▶│ tRPC     │───▶│ Service-Role Supabase   │    │
+│  │Procedure │    │ (invite) │    │   Admin Client           │    │
+│  └──────────┘    └──────────┘    └─────────────────────────┘    │
+└──────────────────────────────────────────────────────────────────┘
 ```
 
 This is defensible only if RLS and narrowly defined database functions remain the final authority. The tRPC procedures add useful validation and UX authorization, while middleware is primarily a routing/session convenience. The risk is that the codebase sometimes treats procedure checks as the boundary even though browser code and direct Supabase APIs remain available. The profile-policy finding demonstrates why the database path must be safe independently.
@@ -144,24 +225,51 @@ There is no structured application logger or error-reporting integration in the 
 For the next stage, retain the monolith but make its boundaries explicit:
 
 ```text
-Route/UI layer
-  - rendering, forms, cache invalidation, Realtime refresh only
-        |
-tRPC transport layer
-  - schemas, actor extraction, stable errors, request IDs
-        |
-Application services
-  - approve member, move task, finalize testimonial, record attendance
-  - authorization preconditions + idempotency + transaction boundary
-        |
-Domain modules
-  - pure state machines, eligibility, KPI definitions, value objects
-        |
-Persistence / Postgres
-  - generated types, repositories or RPCs, RLS, constraints, triggers
-        |
-Async outbox (when integrations are enabled)
-  - email/AI jobs, retries, cost/quota accounting, delivery status
+┌─────────────────────────────────────────────────────────────────┐
+│                     TARGET ARCHITECTURE                         │
+│                                                                 │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │  ROUTE / UI LAYER (src/app/)                            │   │
+│  │  Rendering, forms, cache invalidation, Realtime refresh │   │
+│  └────────────────────────┬────────────────────────────────┘   │
+│                           │                                    │
+│  ┌────────────────────────┴────────────────────────────────┐   │
+│  │  tRPC TRANSPORT LAYER (src/server/api/)                 │   │
+│  │  Input/output schemas, actor extraction, stable errors, │   │
+│  │  request IDs                                            │   │
+│  └────────────────────────┬────────────────────────────────┘   │
+│                           │                                    │
+│  ┌────────────────────────┴────────────────────────────────┐   │
+│  │  APPLICATION SERVICES                                   │   │
+│  │  ┌──────────────┐ ┌──────────────┐ ┌────────────────┐  │   │
+│  │  │ Approve      │ │  Move Task   │ │ Finalize       │  │   │
+│  │  │ Member       │ │              │ │ Testimonial    │  │   │
+│  │  ├──────────────┤ ├──────────────┤ ├────────────────┤  │   │
+│  │  │ Record       │ │  ...         │ │                │  │   │
+│  │  │ Attendance   │ │              │ │                │  │   │
+│  │  └──────────────┘ └──────────────┘ └────────────────┘  │   │
+│  │  Authorization preconditions + idempotency +           │   │
+│  │  transaction boundary                                  │   │
+│  └────────────────────────┬────────────────────────────────┘   │
+│                           │                                    │
+│  ┌────────────────────────┴────────────────────────────────┐   │
+│  │  DOMAIN MODULES                                         │   │
+│  │  Pure state machines, eligibility rules, KPI            │   │
+│  │  definitions, value objects                             │   │
+│  └────────────────────────┬────────────────────────────────┘   │
+│                           │                                    │
+│  ┌────────────────────────┴────────────────────────────────┐   │
+│  │  PERSISTENCE / POSTGRES                                  │   │
+│  │  Generated types, repositories or RPCs, RLS,            │   │
+│  │  constraints, triggers                                  │   │
+│  └────────────────────────┬────────────────────────────────┘   │
+│                           │                                    │
+│  ┌────────────────────────┴────────────────────────────────┐   │
+│  │  ASYNC OUTBOX (when integrations are enabled)            │   │
+│  │  Email/AI jobs, retries, cost/quota accounting,         │   │
+│  │  delivery status                                        │   │
+│  └─────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
 The key design rule is: **the UI may be optimistic, the service may be ergonomic, but Postgres must reject an invalid or unauthorized final state.** The browser should not need to know whether a use case is implemented by a repository or a Postgres function.

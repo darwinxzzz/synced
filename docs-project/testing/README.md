@@ -7,6 +7,42 @@ Synced uses a three-tier testing approach:
 - **Integration Tests** — Test tRPC procedures, database queries, and service logic with real dependencies
 - **E2E Tests** — Test full user workflows via Playwright with a running application
 
+## Testing Pyramid
+
+                           ┌─────────────┐
+                          /│   E2E Tests  │\
+                         / │  (Playwright) │ \
+                        /  └──────────────┘  \
+                       /   ┌────────────────┐  \
+                      /    │  Integration    │   \
+                     /     │    Tests        │    \
+                    /      │   (tRPC + DB)   │     \
+                   /       └────────────────┘      \
+                  /        ┌──────────────────┐      \
+                 /         │   Unit Tests      │       \
+                /          │ (Components,      │        \
+               /           │  Utils, Logic)    │         \
+              /            └──────────────────┘          \
+             /                                           \
+            /            TEST COMMAND MAP                \
+           /  ┌──────────────┬──────────────────┐         \
+          /   │  pnpm test   │  Unit tests      │          \
+         /    │  pnpm test:  │  Integration     │           \
+        /     │  integration │  tests (live DB)  │            \
+       /      │  pnpm e2e:* │  Playwright flows │             \
+      /       └──────────────┴──────────────────┘              \
+     /                                                         \
+    /                                                         \
+   /                                                          \
+  /___________________________________________________________\
+  │                      TEST SCOPE                          │
+  │  ┌───────────┐  ┌───────────┐  ┌────────────────────┐    │
+  │  │   Fast    │  │  Medium   │  │     Slow but        │    │
+  │  │  (ms)     │  │  (seconds)│  │  most realistic     │    │
+  │  │  Isolated │  │  With deps│  │  Full user flows    │    │
+  │  └───────────┘  └───────────┘  └────────────────────┘    │
+  └────────────────────────────────────────────────────────────┘
+
 ## Test Layout
 
 ```text

@@ -27,6 +27,45 @@ Overall posture is **needs remediation before production**. The strongest findin
 ### SEC-001 — Profile owners can likely bypass approval status
 
 - **Vulnerability:** Broken access control / CWE-862 (missing authorization), OWASP A01.
+
+```text
+                     ┌──────────────┐
+                     │  Pending /   │
+                     │  Rejected    │
+                     │  User JWT    │
+                     └──────┬───────┘
+                            │
+                            ▼
+              ┌─────────────────────────┐
+              │  Supabase Client        │
+              │  .from('profiles')      │
+              │  .update({              │
+              │    status: 'active'     │
+              │  })                     │
+              └────────────┬────────────┘
+                           │
+                           ▼
+              ┌─────────────────────────────┐
+              │  RLS Policy Check           │
+              │                             │
+              │  USING: user_id = auth.uid()│
+              │  ✓  Passes (own profile)    │
+              │                             │
+              │  WITH CHECK:                │
+              │  role = old.role  ✓         │
+              │  (status NOT constrained)   │
+              │  ✓  Passes                  │
+              └────────────┬────────────────┘
+                           │
+                           ▼
+              ┌─────────────────────────────┐
+              │  status => 'active'         │
+              │  role => member (unchanged) │
+              │                             │
+              │  APPROVAL GATE BYPASSED     │
+              └─────────────────────────────┘
+```
+
 - **Evidence:** `supabase/migrations/20260408075844_remote_schema.sql:1106-1114` defines a permissive profile-owner update policy. The `using` clause checks ownership and the `with check` clause only preserves the existing `role`; it does not preserve `status`. `supabase/migrations/20260409103000_profiles_admin_approval_gate.sql:14-22` constrains allowed status values but does not remove or replace the update policy.
 - **Exploitability / proof of concept:** Using a pending or rejected user’s authenticated Supabase client, call `profiles.update({ status: 'active' }).eq('id', auth.uid())`. The submitted row keeps the same role, satisfying the shown `with check`, while `active` satisfies the status check. This must be confirmed against the deployed migrated database because this review did not have database connectivity.
 - **Impact:** A user can activate their own account and bypass the admin approval gate. The evidence does not show that this changes `role` to admin, so the demonstrated impact is approval-boundary bypass rather than admin escalation.
@@ -47,6 +86,47 @@ Overall posture is **needs remediation before production**. The strongest findin
 - **Reference:** OWASP A01 Broken Access Control; PostgreSQL security-definer least privilege.
 
 ### SEC-003 — Abuse-rate limiting trusts spoofable identity and local memory
+
+```text
+                    ┌──────────────────┐
+                    │   Attacker       │
+                    │  (many requests) │
+                    └────────┬─────────┘
+                             │
+              ┌──────────────┼──────────────┐
+              │              │              │
+              ▼              ▼              ▼
+        ┌───────────┐ ┌───────────┐ ┌───────────┐
+        │ Request 1 │ │ Request 2 │ │ Request 3 │
+        │ X-Forward-│ │ X-Forward-│ │ X-Forward-│
+        │ ed-For: A │ │ ed-For: B │ │ ed-For: C │
+        └─────┬─────┘ └─────┬─────┘ └─────┬─────┘
+              │             │             │
+              ▼             ▼             ▼
+        ┌──────────────────────────────────────┐
+        │        Next.js Middleware            │
+        │                                      │
+        │  rateLimit Map (process-local)       │
+        │  ┌──────────────────────────────┐   │
+        │  │  A: { count: 1 }  ✓ under   │   │
+        │  │  B: { count: 1 }  ✓ under   │   │
+        │  │  C: { count: 1 }  ✓ under   │   │
+        │  │  ... each IP gets a new      │   │
+        │  │  bucket                      │   │
+        │  └──────────────────────────────┘   │
+        │                                      │
+        │  Instance 1   Instance 2             │
+        │  ┌─────┐     ┌─────┐                │
+        │  │Map A│     │Map B│ (not shared)    │
+        │  └─────┘     └─────┘                │
+        └──────────────────────────────────────┘
+                      │
+                      ▼
+              ┌──────────────────┐
+              │  ALL REQUESTS   │
+              │  PASS THROUGH   │
+              └──────────────────┘
+```
 
 - **Vulnerability:** Ineffective rate limiting / CWE-307 and CWE-346.
 - **Evidence:** `src/middleware.ts:13-25` stores counters in a process-local `Map`; `:30-32` uses the first `x-forwarded-for` value; auth and tRPC thresholds are applied at `:34-43`.

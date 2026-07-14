@@ -10,6 +10,69 @@ The application follows a modern web architecture:
 - **Database:** Supabase Postgres with Row-Level Security for data access control
 - **Authentication:** Supabase SSR auth with OAuth-oriented login flows and session management
 
+```text
+┌─────────────────────────────────────────────────────────┐
+│                   CLIENT LAYER                           │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐              │
+│  │ Browser  │  │  Mobile  │  │   CLI    │              │
+│  └─────┬────┘  └─────┬────┘  └─────┬────┘              │
+│        │              │             │                    │
+└────────┼──────────────┼─────────────┼────────────────────┘
+         │              │             │
+         │              │             │
+         ▼              ▼             ▼
+┌─────────────────────────────────────────────────────────┐
+│                   EDGE / SERVER LAYER                    │
+│  ┌─────────────────────────────────────────────────┐    │
+│  │            Next.js 15 App Router                │    │
+│  │  ┌─────────┐  ┌────────┐  ┌────────────────┐   │    │
+│  │  │Marketing│  │  Auth  │  │ Admin / Member │   │    │
+│  │  │  Pages  │  │ Pages  │  │    Portals     │   │    │
+│  │  └─────────┘  └────────┘  └────────────────┘   │    │
+│  └─────────────────────────────────────────────────┘    │
+│                          │                               │
+│  ┌─────────────────────────────────────────────────┐    │
+│  │              tRPC v11 API Layer                 │    │
+│  │  ┌──────────┐ ┌──────────┐ ┌────────────────┐   │    │
+│  │  │Protected │ │  Admin   │ │    Public      │   │    │
+│  │  │Procedure │ │Procedure │ │   Procedure    │   │    │
+│  │  └─────┬────┘ └────┬─────┘ └───────┬────────┘   │    │
+│  │        │            │               │            │    │
+│  │  ┌─────┴────┐  ┌───┴──────┐  ┌─────┴──────┐     │    │
+│  │  │ Auth /   │  │ Attendance│  │ Kanban /   │     │    │
+│  │  │Dashboard │  │  Events   │  │ Testimonials│    │    │
+│  │  └──────────┘  └──────────┘  └─────────────┘     │    │
+│  └─────────────────────────────────────────────────┘    │
+│                          │                               │
+│  ┌─────────────────────────────────────────────────┐    │
+│  │          Service Layer (src/server/services/)    │    │
+│  │        Business Logic / Domain Services          │    │
+│  └──────────────────────┬──────────────────────────┘    │
+│                         │                                │
+│              ┌──────────┴──────────┐                     │
+│              │  Auth Layer         │                     │
+│              │  src/lib/auth/      │                     │
+│              │  access.ts          │                     │
+│              └─────────────────────┘                     │
+└─────────────────────────┼────────────────────────────────┘
+                          │
+                          ▼
+┌─────────────────────────────────────────────────────────┐
+│                   DATA LAYER                             │
+│  ┌─────────────────────────────────────────────────┐    │
+│  │           Supabase Postgres + RLS               │    │
+│  │  ┌─────────┐ ┌──────────┐ ┌────────────────┐   │    │
+│  │  │  Auth   │ │ Profiles │ │ Application    │   │    │
+│  │  │(Supabase│ │   Table  │ │   Tables       │   │    │
+│  │  │  Auth)  │ │          │ │ (events,       │   │    │
+│  │  │         │ │          │ │ attendance,    │   │    │
+│  │  │         │ │          │ │ contributions, │   │    │
+│  │  │         │ │          │ │ testimonials)  │   │    │
+│  │  └─────────┘ └──────────┘ └────────────────┘   │    │
+│  └─────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────┘
+```
+
 ## Components and Boundaries
 
 ### Frontend (`src/app/`)
@@ -44,6 +107,64 @@ The application follows a modern web architecture:
 - Generated database types are stored in `src/types/database.ts` and consumed by Supabase client helpers.
 
 ## Key Workflows
+
+```text
+                        ┌──────────┐
+                        │  Request │
+                        └────┬─────┘
+                             │
+                             ▼
+                   ┌─────────────────┐
+                   │   Middleware    │
+                   │  (middleware.ts)│
+                   └────────┬────────┘
+                            │
+                    ┌───────┴───────┐
+                    │               │
+               ┌────┴────┐    ┌────┴────┐
+               │ Rate    │    │Session  │
+               │ Limit   │    │Refresh  │
+               └────┬────┘    └────┬────┘
+                    │               │
+                    └───────┬───────┘
+                            │
+                            ▼
+                  ┌──────────────────┐
+                  │  supabase.auth.  │
+                  │   getUser() +    │
+                  │ fetch profile    │
+                  └────────┬─────────┘
+                           │
+                    ┌──────┴──────┐
+                    │             │
+              ┌─────┴────┐  ┌────┴──────┐
+              │ No User  │  │  Has User │
+              │  → Login │  │  + Profile│
+              └──────────┘  └────┬──────┘
+                                 │
+                                 ▼
+                       ┌─────────────────┐
+                       │  evaluateAccess │
+                       │  (access.ts)    │
+                       └────────┬────────┘
+                                │
+                    ┌───────────┼───────────┐
+                    │           │           │
+                    ▼           ▼           ▼
+              ┌─────────┐ ┌─────────┐ ┌─────────┐
+              │ Pending │ │ Inactive│ │ Active  │
+              │ Rejected│ │ /Missing│ │  ✓      │
+              │  → /login│ │ → /login│ │         │
+              └─────────┘ └─────────┘ └────┬────┘
+                                           │
+                                    ┌──────┴──────┐
+                                    │             │
+                              ┌─────┴────┐  ┌────┴──────┐
+                              │  Admin   │  │  Member   │
+                              │ → /admin │  │ → /member │
+                              │ /dashboard│  │ /dashboard│
+                              └──────────┘  └───────────┘
+```
 
 ### Authentication and Role Routing
 1. A user reaches `/login` or a protected `/admin/*` or `/member/*` route.

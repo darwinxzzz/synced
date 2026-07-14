@@ -11,13 +11,94 @@ This document details each tRPC router, its procedures, access levels, and key b
 - Transformer: `superjson`
 - Context: `createTRPCContext` creates a server Supabase client and resolves `user` and `profile` with `getAuthState`.
 
+## Request Flow
+
+┌──────────────┐     GET/POST      ┌────────────────────────────┐
+│   Browser /  │ ──── /api/trpc ──▶│    Next.js Route Handler   │
+│   Component  │                   │  [trpc]/route.ts           │
+└──────┬───────┘                   │  fetchRequestHandler       │
+       │                           └─────────────┬──────────────┘
+       │ ◄──────── JSON Response ────────────────┘
+       │
+       ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    tRPC Server Context                          │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │ createTRPCContext()                                        │  │
+│  │  • Creates Supabase server client                         │  │
+│  │  • Resolves user + profile via getAuthState()             │  │
+│  │  • Exposes supabase, user, profile, headers to procedures │  │
+│  └───────────────────────────────────────────────────────────┘  │
+└─────────────────────────────┬───────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    Procedure Gate Check                         │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────┐  │
+│  │  publicProc  │  │ protectedProc│  │   adminProcedure     │  │
+│  │  No auth     │  │ evaluateAccess│  │ evaluateAccess(     │  │
+│  │  required    │  │ (any active  │  │   requireRole:      │  │
+│  │              │  │  profile)    │  │   "admin")          │  │
+│  └──────┬───────┘  └──────┬───────┘  └──────────┬───────────┘  │
+│         │                │                      │              │
+└─────────┼────────────────┼──────────────────────┼──────────────┘
+          │                │                      │
+          ▼                ▼                      ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    Feature Router Dispatch                      │
+│  ┌───┬───┬───┬───┬───┬───┬───┬───┬───┐                        │
+│  │a  │at │c  │d  │e  │k  │n  │r  │t  │                        │
+│  │uth│tnd│ont│ash│vnt│anb│ews│efl│est│                        │
+│  │   │   │rib│   │s  │an │   │ect│imo│                        │
+│  │   │   │   │   │   │   │   │ns │nia│                        │
+│  └───┴───┴───┴───┴───┴───┴───┴───┴───┘                        │
+└──────────────────────────┬──────────────────────────────────────┘
+                           │
+                           ▼
+              ┌────────────────────────┐
+              │  Zod Input Validation  │
+              └───────────┬────────────┘
+                          │ (validated input)
+                          ▼
+              ┌────────────────────────┐
+              │  Procedure Execution   │
+              │  (router logic /       │
+              │   service calls)       │
+              └───────────┬────────────┘
+                          │
+                          ▼
+              ┌────────────────────────┐
+              │  Supabase / Database   │
+              │  (via server client)   │
+              └────────────────────────┘
+
 ## Procedure Gates
 
-| Gate | Source | Behavior |
-|------|--------|----------|
-| `publicProcedure` | `src/server/api/trpc.ts` | Adds timing middleware only; no auth required. |
-| `protectedProcedure` | `src/server/api/trpc.ts` | Requires `evaluateAccess(ctx.profile)` to pass; returns `UNAUTHORIZED` or `FORBIDDEN` on failure. |
-| `adminProcedure` | `src/server/api/trpc.ts` | Requires `evaluateAccess(ctx.profile, { requireRole: "admin" })` to pass. |
+┌─────────────────────────────────────────────────────────────────┐
+│                    REQUEST ENTRY POINT                          │
+│  ┌──────────────────────────────────────────────────────────┐   │
+│  │               createTRPCContext()                        │   │
+│  │    Creates Supabase client + resolves user/profile       │   │
+│  └──────────────────────┬───────────────────────────────────┘   │
+│                         │                                       │
+│                         ▼                                       │
+│          ┌─────────────────────────────┐                        │
+│          │  Which procedure type?     │                         │
+│          └──────────┬──────────┬──────┘                         │
+│                     │          │    │                            │
+│            ┌────────┘    ┌─────┘    └────────┐                   │
+│            ▼             ▼                    ▼                   │
+│  ┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐    │
+│  │  publicProcedure│ │protectedProcedure│ │ adminProcedure  │    │
+│  ├─────────────────┤ ├─────────────────┤ ├─────────────────┤    │
+│  │ • No auth check │ │ • Calls         │ │ • Calls         │    │
+│  │ • Timing        │ │   evaluateAccess│ │   evaluateAccess│    │
+│  │   middleware    │ │   (ctx.profile) │ │   (ctx.profile, │    │
+│  │   only          │ │ • Fails if:     │ │   {requireRole: │    │
+│  │                 │ │   UNAUTHORIZED  │ │    "admin"})    │    │
+│  │                 │ │   FORBIDDEN     │ │ • Fails if not  │    │
+│  │                 │ │                 │ │   admin role    │    │
+│  └─────────────────┘ └─────────────────┘ └─────────────────┘    │
 
 ## Router Composition
 

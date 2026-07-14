@@ -29,6 +29,55 @@ src/
 └── middleware.ts        # Route guard middleware
 ```
 
+## Visual Layer Map
+
+```text
+┌─────────────────────────────────────────────────────────────────────┐
+│                    PRESENTATION LAYER (src/app/)                    │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐              │
+│  │Marketing │ │   Auth   │ │  Admin   │ │  Member  │              │
+│  │  Pages   │ │  Pages   │ │  Portal  │ │  Portal  │              │
+│  └──────────┘ └──────────┘ └──────────┘ └──────────┘              │
+│         │            │            │           │                     │
+│         └────────────┴────────────┴───────────┘                     │
+│                              │                                      │
+│              ┌───────────────┴───────────────┐                      │
+│              │    Feature Components          │                      │
+│              │  (_components/<feature>/)      │                      │
+│              └───────────────┬───────────────┘                      │
+└──────────────────────────────┼──────────────────────────────────────┘
+                               │ tRPC React Hooks
+                               ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                   API LAYER (src/server/api/)                       │
+│  ┌────────────┐ ┌────────────────────┐ ┌────────────────────────┐  │
+│  │ tRPC Root  │ │  Procedure Gates   │ │  Feature Routers      │  │
+│  │ (root.ts)  │ │ (trpc.ts)          │ │ (routers/*.ts)        │  │
+│  └──────┬─────┘ │ publicProcedure   │ │ ┌───┬───┬───┬───┬──┐ │  │
+│         │       │ protectedProcedure│ │ │auth│att│kbn│...│  │ │  │
+│         │       │ adminProcedure    │ │ └───┴───┴───┴───┴──┘ │  │
+│         │       └────────────────────┘ └────────────────────────┘  │
+│         │                                                          │
+└─────────┼──────────────────────────────────────────────────────────┘
+          │
+          ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                SERVICE LAYER (src/server/services/)                 │
+│              Business Logic / Domain Services (testimonials/)      │
+└──────────────────────────────┬──────────────────────────────────────┘
+                               │
+          ┌────────────────────┼────────────────────┐
+          │                    │                    │
+          ▼                    ▼                    ▼
+┌─────────────────┐ ┌─────────────────┐ ┌────────────────────────────┐
+│   DATA ACCESS   │ │   AUTH LAYER    │ │       TYPES                │
+│ src/lib/supabase│ │ src/lib/auth/   │ │  src/types/                │
+│ ┌───┬───┬────┐  │ │ access.ts       │ │  ┌──────────────────────┐ │
+│ │Srv│Clt│Adm │  │ │ evaluateAccess()│ │  │database.ts (gen)    │ │
+│ └───┴───┴────┘  │ │ getAuthState()  │ │  │Domain types (manual)│ │
+└─────────────────┘ └─────────────────┘ └──────────────────────────┘
+```
+
 ## Layers and Boundaries
 - **Presentation (`app/`)**: Pages, layouts, route groups, and UI components. Client components handle interactivity; server components and API routes handle server-side execution.
 - **API (`server/api/`)**: tRPC router definitions and transport-agnostic procedure declarations. Each feature area has its own router file under `src/server/api/routers/`.

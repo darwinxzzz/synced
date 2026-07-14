@@ -175,21 +175,75 @@ Source type: `Tables<"reflections">`
 ## Relationships
 Generated type metadata currently reports `Relationships: []` for every table, so the following map is inferred from foreign-key-like column names:
 
-```text
-profiles.id
-  ├─ events.created_by
-  ├─ event_members.user_id ─────┐
-  ├─ attendance.user_id         │
-  ├─ contributions.user_id      │
-  │    └─ reflections.contribution_id
-  ├─ reflections.user_id
-  ├─ testimonial_requests.user_id
-  └─ testimonials.user_id
+### Entity Relationship Diagram
 
-events.id
-  ├─ event_members.event_id
-  ├─ attendance.event_id
-  └─ contributions.event_id
+```text
+┌─────────────────┐       ┌──────────────────────┐
+│    Profiles     │       │       Events         │
+├─────────────────┤       ├──────────────────────┤
+│ PK id (uuid) ◄──┼───────┼─ FK created_by       │
+│   email         │       │   name               │
+│   name          │       │   status             │
+│   role          │       │   date               │
+│   status        │       │   description        │
+│   department    │       │   is_recurring       │
+│   avatar_url    │       └──────────┬───────────┘
+│   joined_date   │                  │
+└────────┬────────┘                  │
+         │                          │
+         │ has many                 │ has many
+    ┌────┼────┐                     │
+    │    │    │                     │
+    ▼    │    │                     ▼
+┌────────┴┐   │            ┌────────────────┐
+│ Event   │   │            │ Event_Members  │
+│_Members │   │            ├────────────────┤
+├─────────┤   │            │ PK id          │
+│ PK id   │   │            │ FK event_id ◄──┘
+│ FK ◄────┘   │            │ FK user_id ◄────┐
+│ user_id     │            │   pillar_status │
+│ event_id ───┼────────────┘   department    │
+│ department  │                role          │
+│ role        │                task          │
+│ task        │               └──────────────┘
+│ pillar_     │
+│ status      │               ┌────────────────┐
+└─────────────┘               │  Attendance    │
+                              ├────────────────┤
+┌────────────────┐            │ PK id          │
+│ Contributions  │            │ FK user_id ◄───┼────┐
+├────────────────┤            │ FK event_id ◄──┼──┐ │
+│ PK id          │            │   date         │  │ │
+│ FK user_id ◄───┼────────────┤   status       │  │ │
+│ FK event_id ◄──┼────────────┘   type         │  │ │
+│   department   │              └──────────────┘  │ │
+│   task         │                                │ │
+│   priority     │              ┌────────────────┐│ │
+│   description  │              │  Reflections   ││ │
+│   outcome      │              ├────────────────┤│ │
+│   submitted_at │              │ PK id          ││ │
+└───────┬────────┘              │ FK user_id ◄───┼┘ │
+        │                      │ FK cont. ◄─────┘  │
+        │ has many             │   id              │
+        ▼                      │   status          │
+┌────────────────┐            │   description     │
+│  Reflections   │            │   challenges      │
+├────────────────┤            └───────────────────┘
+│ FK cont. ◄─────┘
+│   id           │            ┌─────────────────────┐
+├────────────────┤            │ Testimonials        │
+│   ...          │            ├─────────────────────┤
+└────────────────┘            │ PK id               │
+                              │ FK user_id ◄────────┤
+┌──────────────────┐          │ FK generated_by     │
+│ Testimonial_     │          │   content_json      │
+│ Requests         │          │   endorsement_name  │
+├──────────────────┤          └─────────────────────┘
+│ PK id            │
+│ FK user_id ◄─────┤
+│   status         │
+│   requested_at   │
+└──────────────────┘
 ```
 
 Common inferred cardinalities:
@@ -207,6 +261,38 @@ Common inferred cardinalities:
 - RLS policies enforce data access control at the database layer, with application-level authorization using auth types such as `UserRole`, `AccessProfile`, and `AuthState` in `src/lib/auth/access.ts`.
 
 ## Data Flows
+
+### Visual Flows
+
+```text
+                    EVENT CREATION FLOW
+┌──────────┐    ┌─────────────┐    ┌────────────┐    ┌──────────────┐
+│  Author  │───▶│ tRPC Router │───▶│  Service   │───▶│  Supabase    │
+│  submits │    │  events     │    │  validate  │    │  create_event│
+│  form    │    │  .create    │    │  + call DB │    │  RPC +       │
+│          │    │             │    │            │    │  event_members│
+└──────────┘    └─────────────┘    └────────────┘    └──────────────┘
+
+                    TESTIMONIAL LIFECYCLE
+┌──────────┐   ┌──────────────┐   ┌──────────────┐   ┌────────────┐
+│  Member  │──▶│ Testimonial  │──▶│   Admin      │──▶│ Finalised  │
+│ Requests │   │ Requests     │   │ Generates    │   │ Testimonial│
+│          │   │ (pending)    │   │ Endorsement  │   │ (archived) │
+└──────────┘   └──────────────┘   └──────┬───────┘   └────────────┘
+                                         │
+                                    ┌────┴────┐
+                                    │ content │
+                                    │ _json   │
+                                    └─────────┘
+
+                    CONTRIBUTION + REFLECTION FLOW
+┌──────────┐   ┌────────────────┐   ┌──────────────┐   ┌──────────┐
+│  Member  │──▶│  Contribution  │──▶│  Reflection  │──▶│ Archived │
+│ starts   │   │  (in_progress) │   │  (submitted) │   │ (done)   │
+│ task     │   │                │   │              │   │          │
+└──────────┘   └────────────────┘   └──────────────┘   └──────────┘
+```
+
 - **Event creation:** authorized user submits event details and member ids → tRPC/server service validates and calls Supabase, optionally via the `create_event` SQL function → `events` row is created → related `event_members` rows associate members with the event.
 - **Attendance tracking:** user/event/date attendance data is submitted → service validates allowed status/type values where applicable → `attendance` row is inserted or updated under RLS.
 - **Contribution and reflection:** member contribution/task data is stored in `contributions` → member submits periodic reflection linked by `contribution_id` → reflection status and submission timestamps track lifecycle.
